@@ -545,6 +545,17 @@ app.post('/api/webhook/mercadopago', (req, res) => {
   res.json({ received: true });
 });
 
+// ===== ADMIN AUTH =====
+app.post('/api/admin/auth', (req, res) => {
+  const { password } = req.body;
+  const adminPass = process.env.ADMIN_PASSWORD || 'impulsiona2401';
+  if (password === adminPass) {
+    res.json({ success: true });
+  } else {
+    res.json({ success: false, error: 'Senha incorreta' });
+  }
+});
+
 app.post('/api/webhook/test', (req, res) => {
   console.log('[WEBHOOK TEST] OK');
   res.json({ success: true });

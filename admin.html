@@ -60,7 +60,20 @@
 <body>
   <header class="navbar" id="navbar"></header>
 
-  <div class="admin-header">
+  <!-- TELA DE LOGIN -->
+  <div id="admin-login" style="display:flex;justify-content:center;align-items:center;min-height:60vh;">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:2.5rem;max-width:400px;width:100%;text-align:center;">
+      <div style="font-size:3rem;margin-bottom:1rem;">🔒</div>
+      <h2 style="margin-bottom:0.5rem;">Acesso Restrito</h2>
+      <p style="color:var(--text-muted);margin-bottom:1.5rem;font-size:0.9rem;">Digite a senha para acessar o painel administrativo</p>
+      <input type="password" id="admin-password" class="search-box" placeholder="Digite a senha..." style="margin-bottom:1rem;text-align:center;" onkeydown="if(event.key==='Enter')loginAdmin()">
+      <p id="admin-login-error" style="color:#e74c3c;font-size:0.85rem;margin-bottom:1rem;display:none;"></p>
+      <button class="btn btn-primary" onclick="loginAdmin()" style="width:100%;" id="btn-admin-login">Entrar</button>
+    </div>
+  </div>
+
+  <!-- CONTEÚDO ADMIN (oculto até login) -->
+  <div id="admin-content" style="display:none;">
     <div class="container">
       <h1>Painel Administrativo</h1>
       <p>Visualize todos os dados do sistema</p>
@@ -232,10 +245,46 @@
       </div>
     </div>
   </section>
+  </div><!-- fim admin-content -->
 
   <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
   <script>
     renderNavbar();
+
+    async function loginAdmin() {
+      const pass = document.getElementById('admin-password').value.trim();
+      const errEl = document.getElementById('admin-login-error');
+      const btn = document.getElementById('btn-admin-login');
+      if (!pass) { errEl.textContent = 'Digite a senha'; errEl.style.display = 'block'; return; }
+      btn.textContent = 'Verificando...';
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
+        const data = await r.json();
+        if (data.success) {
+          sessionStorage.setItem('admin_auth', 'true');
+          document.getElementById('admin-login').style.display = 'none';
+          document.getElementById('admin-content').style.display = 'block';
+          initAdmin();
+        } else {
+          errEl.textContent = data.error || 'Senha incorreta';
+          errEl.style.display = 'block';
+        }
+      } catch(e) {
+        errEl.textContent = 'Erro ao conectar';
+        errEl.style.display = 'block';
+      }
+      btn.textContent = 'Entrar';
+      btn.disabled = false;
+    }
+
+    if (sessionStorage.getItem('admin_auth') === 'true') {
+      document.getElementById('admin-login').style.display = 'none';
+      document.getElementById('admin-content').style.display = 'block';
+      initAdmin();
+    }
+
+    function initAdmin() {
 
     const MP_CONFIG_KEY = 'impulsiona_mp_config';
 
@@ -795,6 +844,7 @@
     const sync = new BroadcastChannel('impulsiona_sync');
     sync.onmessage = () => renderAll();
     setInterval(renderAll, 3000);
+    }
   </script>
 </body>
 </html>
