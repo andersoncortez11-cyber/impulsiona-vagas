@@ -209,10 +209,11 @@
     let selectedPlan = null;
     let companyData = {};
 
-    const MP_CONFIG_KEY = 'impulsiona_mp_config';
-
-    function getMpConfig() {
-      return JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+    async function getMpConfig() {
+      try {
+        const r = await fetch('/api/mp-config');
+        return await r.json();
+      } catch(e) { return {}; }
     }
 
     function switchTab(type, btn) {
@@ -311,8 +312,8 @@
       document.getElementById('step-plan').classList.remove('hidden');
     }
 
-    function goToMpCheckout() {
-      const config = getMpConfig();
+    async function goToMpCheckout() {
+      const config = await getMpConfig();
       const checkoutUrl = config.checkoutUrl;
 
       if (!checkoutUrl) {

@@ -286,9 +286,7 @@
 
     function initAdmin() {
 
-    const MP_CONFIG_KEY = 'impulsiona_mp_config';
-
-    function toggleMpMode() {
+    async function toggleMpMode() {
       const isTest = document.getElementById('mp-mode-test').checked;
       const hint = document.getElementById('mp-token-hint');
       const label = document.getElementById('mp-access-token');
@@ -305,10 +303,6 @@
         prodLabel.style.borderColor = 'var(--primary)';
         testLabel.style.borderColor = 'var(--border)';
       }
-      // Save mode preference
-      const old = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
-      old.mode = isTest ? 'test' : 'production';
-      localStorage.setItem(MP_CONFIG_KEY, JSON.stringify(old));
     }
 
     function copyWebhookUrl() {
@@ -320,7 +314,8 @@
       const statusEl = document.getElementById('webhook-status');
       statusEl.innerHTML = '<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:0.75rem; color:#856404; font-size:0.85rem;">⏳ Enviando notificação de teste...</div>';
       try {
-        const config = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+        let config = {};
+        try { const r = await fetch('/api/mp-config'); config = await r.json(); } catch(e) {}
         const r = await fetch('/api/webhook/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -358,7 +353,8 @@
 
     async function cancelSubscription(userId) {
       if (!confirm('Cancelar esta assinatura? A empresa perderá o acesso.')) return;
-      const config = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+      let config = {};
+      try { const r = await fetch('/api/mp-config'); config = await r.json(); } catch(e) {}
       const users = DB.get('users') || [];
       const user = users.find(u => u.id === userId);
       if (!user || !user.subscription) return;
@@ -381,34 +377,44 @@
       }
     }
 
-    function loadMpConfig() {
-      const config = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
-      if (config.checkoutUrl) document.getElementById('mp-checkout-url').value = config.checkoutUrl;
-      if (config.accessToken) document.getElementById('mp-access-token').value = config.accessToken;
-      if (config.backUrl) document.getElementById('mp-back-url').value = config.backUrl;
-      if (config.mode === 'test') {
-        document.getElementById('mp-mode-test').checked = true;
-        toggleMpMode();
-      }
-      // Set webhook URL
+    async function loadMpConfig() {
+      try {
+        const r = await fetch('/api/mp-config');
+        const config = await r.json();
+        if (config.checkoutUrl) document.getElementById('mp-checkout-url').value = config.checkoutUrl;
+        if (config.accessToken) document.getElementById('mp-access-token').value = config.accessToken;
+        if (config.backUrl) document.getElementById('mp-back-url').value = config.backUrl;
+        if (config.mode === 'test') {
+          document.getElementById('mp-mode-test').checked = true;
+          toggleMpMode();
+        }
+      } catch(e) { console.error('[MP] Erro ao carregar config:', e); }
       document.getElementById('mp-webhook-url').value = window.location.origin + '/api/webhook/mercadopago';
-      // Render subscriptions
       renderSubscriptions();
     }
 
-    function saveMpConfig() {
+    async function saveMpConfig() {
       const accessToken = document.getElementById('mp-access-token').value.trim();
       const checkoutUrl = document.getElementById('mp-checkout-url').value.trim();
       const backUrl = document.getElementById('mp-back-url').value.trim();
       const mode = document.getElementById('mp-mode-test').checked ? 'test' : 'production';
-      if (!checkoutUrl) {
-        showToast('Crie o plano primeiro ou insira um link', 'error');
-        return;
+      if (!accessToken) { showToast('Insira o Access Token', 'error'); return; }
+      try {
+        const r = await fetch('/api/mp-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken, checkoutUrl, backUrl, mode })
+        });
+        const data = await r.json();
+        if (data.success) {
+          document.getElementById('mp-config-status').innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Configuração salva no servidor! Modo: ' + (mode === 'test' ? 'TESTE' : 'PRODUÇÃO') + '</div>';
+          showToast('Configuração salva!', 'success');
+        } else {
+          showToast('Erro ao salvar: ' + (data.error || 'desconhecido'), 'error');
+        }
+      } catch(e) {
+        showToast('Erro ao salvar: ' + e.message, 'error');
       }
-      const old = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
-      localStorage.setItem(MP_CONFIG_KEY, JSON.stringify({ ...old, accessToken, checkoutUrl, backUrl, mode }));
-      document.getElementById('mp-config-status').innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Configuração salva! Modo: ' + (mode === 'test' ? 'TESTE' : 'PRODUÇÃO') + '</div>';
-      showToast('Configuração salva!', 'success');
     }
 
     async function testMpConnection() {
@@ -466,7 +472,6 @@
           },
           back_url: document.getElementById('mp-back-url') ? document.getElementById('mp-back-url').value.trim() : (window.location.origin + '/company-dashboard.html')
         });
-        console.log('[MP] Enviando plano:', planBody);
         const r = await fetch('/api/mp/preapproval_plan', {
           method: 'POST',
           headers: {
@@ -476,25 +481,28 @@
           body: planBody
         });
 
-        console.log('[MP] Plan response status:', r.status);
         const data = await r.json();
-        console.log('[MP] Plan response:', data);
 
         if (data.id) {
           const checkoutUrl = 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=' + data.id;
           document.getElementById('mp-checkout-url').value = checkoutUrl;
 
-          const old = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
-          localStorage.setItem(MP_CONFIG_KEY, JSON.stringify({ ...old, accessToken, planId: data.id, checkoutUrl }));
+          const mode = isTest ? 'test' : 'production';
+          const backUrl = document.getElementById('mp-back-url') ? document.getElementById('mp-back-url').value.trim() : '';
+          await fetch('/api/mp-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accessToken, planId: data.id, checkoutUrl, backUrl, mode })
+          });
 
-          statusEl.innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Plano criado! ID: ' + data.id + '<br>Agora clique em "Salvar configuração".</div>';
+          statusEl.innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Plano criado! ID: ' + data.id + '<br>Salvo no servidor. Clique em "Salvar configuração" para confirmar.</div>';
           showToast('Plano criado com sucesso!', 'success');
         } else {
           const errMsg = data.message || data.cause || JSON.stringify(data);
           statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Erro: ' + errMsg + '</div>';
         }
       } catch(e) {
-        statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Erro: ' + e.message + '<br>Certifique-se que o servidor está rodando (node server.js)</div>';
+        statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Erro: ' + e.message + '</div>';
       }
 
       btn.disabled = false;

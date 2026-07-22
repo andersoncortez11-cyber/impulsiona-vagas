@@ -84,6 +84,15 @@ async function initDB() {
       pdf TEXT, "pdfName" TEXT,
       "createdAt" TEXT, "updatedAt" TEXT
     );
+    CREATE TABLE IF NOT EXISTS mp_config (
+      id TEXT PRIMARY KEY DEFAULT 'default',
+      "accessToken" TEXT,
+      "planId" TEXT,
+      "checkoutUrl" TEXT,
+      "backUrl" TEXT,
+      mode TEXT DEFAULT 'test',
+      "updatedAt" TEXT
+    );
   `);
   console.log('[DB] PostgreSQL inicializado');
 }
@@ -554,6 +563,25 @@ app.post('/api/admin/auth', (req, res) => {
   } else {
     res.json({ success: false, error: 'Senha incorreta' });
   }
+});
+
+// ===== MP CONFIG (server-side) =====
+app.get('/api/mp-config', async (req, res) => {
+  try {
+    const row = (await db.query('SELECT * FROM mp_config WHERE id = $1', ['default'])).rows[0];
+    res.json(row || {});
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/mp-config', async (req, res) => {
+  try {
+    const { accessToken, planId, checkoutUrl, backUrl, mode } = req.body;
+    await db.query(`INSERT INTO mp_config (id,"accessToken","planId","checkoutUrl","backUrl",mode,"updatedAt")
+      VALUES ('default',$1,$2,$3,$4,$5,$6)
+      ON CONFLICT (id) DO UPDATE SET "accessToken"=$1,"planId"=$2,"checkoutUrl"=$3,"backUrl"=$4,mode=$5,"updatedAt"=$6`,
+      [accessToken||'', planId||'', checkoutUrl||'', backUrl||'', mode||'test', now()]);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/webhook/test', (req, res) => {
