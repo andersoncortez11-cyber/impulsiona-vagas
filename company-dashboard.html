@@ -1,0 +1,292 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel da Empresa - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <div class="dashboard">
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="company-dashboard.html" class="active">📊 Painel</a></li>
+        <li><a href="company-jobs.html">💼 Minhas Vagas</a></li>
+        <li><a href="create-job.html">➕ Nova Vaga</a></li>
+        <li><a href="company-applications.html">📩 Candidaturas</a></li>
+        <li><a href="messages.html">💬 Mensagens</a></li>
+        <li><a href="notifications.html">🔔 Notificações</a></li>
+        <li><button onclick="Auth.logout()">🚪 Sair</button></li>
+        <li style="margin-top:auto; padding-top:1rem; border-top:1px solid var(--border);"><button onclick="Auth.deleteAccount()" style="color:var(--danger);">🗑 Excluir conta</button></li>
+      </ul>
+    </aside>
+
+    <main class="dashboard-content" id="dash-content"></main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+
+    // Handle return from Mercado Pago checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    const mpStatus = urlParams.get('status');
+    const preapprovalId = urlParams.get('preapproval_id') || urlParams.get('preapproval');
+    const pendingStr = localStorage.getItem('impulsiona_pending_company');
+
+    if (pendingStr && (mpStatus || preapprovalId)) {
+      try {
+        const pending = JSON.parse(pendingStr);
+        const now = new Date();
+        const expiresAt = new Date(now);
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+        const subData = {
+          plan: 'monthly',
+          price: 49.99,
+          status: mpStatus || 'authorized',
+          preapprovalId: preapprovalId || '',
+          startedAt: now.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          autoRenew: true
+        };
+
+        // Check if user already exists (re-subscription)
+        const existingUsers = DB.getUsers();
+        const existing = existingUsers.find(u => u.email === pending.email);
+
+        if (existing) {
+          existing.subscription = subData;
+          DB.setUsers(existingUsers);
+          DB.setCurrentUser(existing);
+          showToast('Assinatura renovada com sucesso!', 'success');
+        } else {
+          const result = Auth.register({
+            email: pending.email,
+            password: pending.password,
+            type: 'company',
+            name: pending.name,
+            company: pending.company || pending.name,
+            cnpj: pending.cnpj || '',
+            subscription: subData
+          });
+
+          if (result.success) {
+            showToast('Conta criada e pagamento confirmado!', 'success');
+          }
+        }
+
+        localStorage.removeItem('impulsiona_pending_company');
+        window.history.replaceState({}, '', 'company-dashboard.html');
+      } catch (e) {
+        console.error('[MP Return] Erro:', e);
+        localStorage.removeItem('impulsiona_pending_company');
+      }
+    }
+
+    const user = Auth.getUser();
+
+    // If no user logged in, redirect to login
+    if (!user || user.type !== 'company') {
+      // Check if there's a pending company without MP return (payment not completed)
+      if (pendingStr && !mpStatus && !preapprovalId) {
+        window.location.href = 'register.html';
+      } else {
+        window.location.href = 'login.html';
+      }
+    }
+
+    // Check subscription
+    if (user && !Auth.hasActiveSubscription()) {
+      const sub = user.subscription || {};
+      const isExpired = sub.expiresAt && new Date(sub.expiresAt) < new Date();
+      document.getElementById('dash-content').innerHTML = `
+        <div style="text-align:center; padding:4rem 2rem;">
+          <div style="font-size:4rem; margin-bottom:1rem;">${isExpired ? '⏰' : '💳'}</div>
+          <h2 style="margin-bottom:0.5rem;">${isExpired ? 'Assinatura expirada' : 'Assinatura necessária'}</h2>
+          <p style="color:var(--text-light); margin-bottom:2rem; max-width:500px; margin-left:auto; margin-right:auto;">
+            ${isExpired
+              ? 'Sua assinatura expirou em ' + new Date(sub.expiresAt).toLocaleDateString('pt-BR') + '. Renove para continuar usando o painel.'
+              : 'Para acessar o painel da empresa, é necessário ter uma assinatura ativa de <strong>R$ 49,99/mês</strong> via Mercado Pago.'
+            }
+          </p>
+          <a href="register.html" class="btn btn-primary" style="display:inline-block; padding:0.75rem 2rem; font-size:1rem;">
+            💳 ${isExpired ? 'Renovar assinatura' : 'Assinar agora'}
+          </a>
+          <br><br>
+          <button onclick="Auth.logout()" class="btn btn-outline" style="display:inline-block;">Voltar</button>
+        </div>
+      `;
+    } else {
+      loadDashboard();
+    }
+
+    let _dashHash = '';
+
+    function refreshDash() {
+      _dashHash = '';
+      if (user && Auth.hasActiveSubscription()) loadDashboard();
+    }
+
+    function loadDashboard() {
+      const stats = Jobs.getStats(user.id);
+      const recentApps = Applications.getByCompany(user.id)
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+        .slice(0, 8);
+
+      const newHash = JSON.stringify(stats) + recentApps.map(a => a.id + a.status).join(',');
+      if (newHash === _dashHash) { renderNavbar(); return; }
+      _dashHash = newHash;
+
+      const users = DB.get('users');
+
+      document.getElementById('dash-content').innerHTML = `
+      <h1 style="margin-bottom:0.5rem;">Painel da Empresa <span class="live-dot" title="Atualização em tempo real"></span></h1>
+      <p style="color:var(--text-light); margin-bottom:2rem;">${user.company || user.name} - Gerencie suas vagas e candidatos</p>
+
+      <div class="dash-stats">
+        <div class="dash-stat-card">
+          <div class="stat-icon blue">💼</div>
+          <div class="stat-value">${stats.totalJobs}</div>
+          <div class="stat-title">Total de vagas</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-icon green">✅</div>
+          <div class="stat-value">${stats.activeJobs}</div>
+          <div class="stat-title">Vagas ativas</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-icon orange">📩</div>
+          <div class="stat-value">${stats.totalApplications}</div>
+          <div class="stat-title">Candidaturas recebidas</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-icon red">⏳</div>
+          <div class="stat-value">${stats.pendingApplications}</div>
+          <div class="stat-title">Pendentes de análise</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:1rem; margin-bottom:2rem;">
+        <a href="create-job.html" class="btn btn-primary">➕ Publicar nova vaga</a>
+        <a href="company-jobs.html" class="btn btn-outline">Ver todas as vagas</a>
+      </div>
+
+      <div class="card" style="margin-bottom:2rem;">
+        <div style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="font-size:1.1rem;">Candidaturas recentes</h3>
+          <a href="company-applications.html" style="color:var(--primary); font-size:0.9rem; font-weight:600;">Ver todas →</a>
+        </div>
+        ${recentApps.length === 0
+          ? '<div class="card-body"><div class="empty-state" style="padding:1rem;"><div class="empty-icon">📩</div><h3>Nenhuma candidatura ainda</h3><p>Publique vagas para receber candidaturas</p></div></div>'
+          : `<div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Candidato</th>
+                    <th>Vaga</th>
+                    <th>Data</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recentApps.map(a => {
+                    const job = Jobs.getById(a.jobId);
+                    const candidate = users.find(u => u.id === a.userId);
+                    if (!job || !candidate) return '';
+                    return `
+                      <tr>
+                        <td><strong>${candidate.name}</strong></td>
+                        <td>${job.title}</td>
+                        <td>${formatDate(a.updatedAt)}</td>
+                        <td><span class="tag ${getStatusClass(a.status)}">${getStatusText(a.status)}</span></td>
+                        <td>
+                          <div class="table-actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewCandidate('${a.userId}','${a.jobId}','${a.id}')">Ver</button>
+                            ${a.status === 'pending' ? `
+                              <button class="btn btn-sm btn-secondary" onclick="updateAppStatus('${a.id}','viewed')">Verificado</button>
+                              <button class="btn btn-sm btn-primary" onclick="updateAppStatus('${a.id}','accepted')">Aceitar</button>
+                              <button class="btn btn-sm btn-danger" onclick="updateAppStatus('${a.id}','rejected')">Rejeitar</button>
+                            ` : ''}
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>`
+        }
+      </div>
+    `;
+    renderNavbar();
+    }
+
+    refreshDash();
+
+    function updateAppStatus(appId, status) {
+      Applications.updateStatus(appId, status);
+      showToast('Status atualizado!', 'success');
+      refreshDash();
+    }
+
+    function viewCandidate(userId, jobId, appId) {
+      const users = DB.get('users');
+      const candidate = users.find(u => u.id === userId);
+      const resume = Resume.getByUserId(userId);
+      const apps = DB.get('applications');
+      const app = apps.find(a => a.id === appId);
+      const job = Jobs.getById(jobId);
+      if (app && app.status === 'pending') Applications.updateStatus(appId, 'viewed');
+
+      let resumeHTML = '';
+      if (resume) {
+        resumeHTML = `
+          <div style="margin-top:1rem;">
+            <h4>Experiência:</h4>
+            ${(resume.experience || []).map(e => `<p style="font-size:0.9rem;"><strong>${e.role}</strong> - ${e.company} (${e.period})</p>`).join('')}
+            <h4 style="margin-top:0.75rem;">Habilidades:</h4>
+            <div style="display:flex; flex-wrap:wrap; gap:4px;">
+              ${(resume.skills || []).map(s => `<span class="tag tag-blue">${s}</span>`).join('')}
+            </div>
+            <p style="margin-top:0.75rem; font-size:0.9rem;">${resume.summary || ''}</p>
+          </div>
+        `;
+      }
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay show';
+      modal.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <h3>${candidate.name}</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p><strong>Email:</strong> ${candidate.email}</p>
+            ${app?.coverLetter ? `<div style="margin-top:1rem;"><h4>Carta de apresentação:</h4><p style="font-size:0.9rem; color:var(--text-light); font-style:italic;">"${app.coverLetter}"</p></div>` : ''}
+            ${resumeHTML}
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Fechar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    Sync.on('jobs', () => { refreshDash(); });
+    Sync.on('applications', () => { refreshDash(); });
+    Sync.on('users', () => { refreshDash(); });
+    Live.register('company-dash', { refresh: () => { refreshDash(); } });
+    Live.start(3000);
+  </script>
+</body>
+</html>
+

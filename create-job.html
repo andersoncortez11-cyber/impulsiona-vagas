@@ -1,0 +1,186 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Publicar Vaga - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <section class="container" style="max-width:800px;">
+    <div class="page-header">
+      <h1>Publicar nova vaga</h1>
+    </div>
+
+    <div class="card card-body" style="padding:2rem;">
+      <form id="create-job-form" onsubmit="handleCreateJob(event)">
+        <div class="form-group">
+          <label>Título da vaga *</label>
+          <input type="text" id="j-title" required placeholder="Ex: Desenvolvedor Full Stack Pleno">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Categoria *</label>
+            <select id="j-category" required>
+              <option value="">Selecione</option>
+              <option value="Tecnologia">Tecnologia</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Design">Design</option>
+              <option value="Gestão">Gestão</option>
+              <option value="Financeiro">Financeiro</option>
+              <option value="Saúde">Saúde</option>
+              <option value="Educação">Educação</option>
+              <option value="Engenharia">Engenharia</option>
+              <option value="Jurídico">Jurídico</option>
+              <option value="Vendas">Vendas</option>
+              <option value="RH">RH</option>
+              <option value="Logística">Logística</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Departamento</label>
+            <input type="text" id="j-department" placeholder="Ex: Engenharia">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Descrição da vaga *</label>
+          <textarea id="j-description" rows="5" required placeholder="Descreva as responsabilidades e o que a empresa oferece..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Requisitos (um por linha) *</label>
+          <textarea id="j-requirements" rows="4" required placeholder="React.js&#10;Node.js&#10;TypeScript&#10;Git"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Benefícios (um por linha)</label>
+          <textarea id="j-benefits" rows="3" placeholder="Plano de saúde&#10;Vale-refeição&#10;Home office"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Salário mínimo (R$)</label>
+            <input type="number" id="j-salary-min" placeholder="5000">
+          </div>
+          <div class="form-group">
+            <label>Salário máximo (R$)</label>
+            <input type="number" id="j-salary-max" placeholder="10000">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tipo de contratação *</label>
+            <select id="j-type" required>
+              <option value="CLT">CLT</option>
+              <option value="PJ">PJ</option>
+              <option value="Estágio">Estágio</option>
+              <option value="Freelancer">Freelancer</option>
+              <option value="Temporário">Temporário</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Regime de trabalho *</label>
+            <select id="j-regime" required>
+              <option value="Presencial">Presencial</option>
+              <option value="Remoto">Remoto</option>
+              <option value="Híbrido">Híbrido</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nível de experiência *</label>
+            <select id="j-experience" required>
+              <option value="Estágio">Estágio</option>
+              <option value="Júnior">Júnior</option>
+              <option value="Pleno">Pleno</option>
+              <option value="Senior">Senior</option>
+              <option value="Gerência">Gerência</option>
+              <option value="Diretoria">Diretoria</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Escolaridade mínima</label>
+            <select id="j-education">
+              <option value="Fundamental">Fundamental</option>
+              <option value="Médio">Médio</option>
+              <option value="Cursando superior">Cursando superior</option>
+              <option value="Superior completo" selected>Superior completo</option>
+              <option value="Pós-graduação">Pós-graduação</option>
+              <option value="Mestrado">Mestrado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Localização *</label>
+            <input type="text" id="j-location" required placeholder="São Paulo, SP">
+          </div>
+          <div class="form-group" style="display:flex; align-items:flex-end; gap:1rem;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:10px 0;">
+              <input type="checkbox" id="j-urgent"> Vaga urgente
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:10px 0;">
+              <input type="checkbox" id="j-featured"> Vaga em destaque
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:1rem;">
+          <button type="submit" class="btn btn-primary btn-lg">Publicar vaga</button>
+          <a href="company-dashboard.html" class="btn btn-outline btn-lg">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const user = Auth.getUser();
+    if (!user || user.type !== 'company') { window.location.href = 'login.html'; }
+    if (user && !Auth.hasActiveSubscription()) { window.location.href = 'company-dashboard.html'; }
+
+    function handleCreateJob(e) {
+      e.preventDefault();
+      const salaryMin = parseInt(document.getElementById('j-salary-min').value) || 0;
+      const salaryMax = parseInt(document.getElementById('j-salary-max').value) || 0;
+      const salary = salaryMin && salaryMax
+        ? `R$ ${salaryMin.toLocaleString('pt-BR')} - R$ ${salaryMax.toLocaleString('pt-BR')}`
+        : salaryMax ? `Até R$ ${salaryMax.toLocaleString('pt-BR')}` : 'A combinar';
+
+      const data = {
+        title: document.getElementById('j-title').value,
+        category: document.getElementById('j-category').value,
+        department: document.getElementById('j-department').value,
+        description: document.getElementById('j-description').value,
+        requirements: document.getElementById('j-requirements').value.split('\n').filter(Boolean),
+        benefits: document.getElementById('j-benefits').value.split('\n').filter(Boolean),
+        salary, salaryMin, salaryMax,
+        type: document.getElementById('j-type').value,
+        regime: document.getElementById('j-regime').value,
+        experience: document.getElementById('j-experience').value,
+        education: document.getElementById('j-education').value,
+        location: document.getElementById('j-location').value,
+        urgent: document.getElementById('j-urgent').checked,
+        featured: document.getElementById('j-featured').checked,
+      };
+
+      Jobs.create(data);
+      showToast('Vaga publicada com sucesso!', 'success');
+      setTimeout(() => window.location.href = 'company-jobs.html', 800);
+    }
+  </script>
+</body>
+</html>
+

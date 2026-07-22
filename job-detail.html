@@ -1,0 +1,257 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalhe da Vaga - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <section class="container" id="job-detail-content"></section>
+
+  <!-- Apply Modal -->
+  <div class="modal-overlay" id="apply-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Candidatar-se para esta vaga</h3>
+        <button class="modal-close" onclick="closeModal('apply-modal')">&times;</button>
+      </div>
+      <div class="modal-body" id="apply-modal-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('apply-modal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="submitApplication()">Enviar candidatura</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const jobId = new URLSearchParams(window.location.search).get('id');
+    const job = Jobs.getById(jobId);
+
+    if (!job) {
+      document.getElementById('job-detail-content').innerHTML = `
+        <div class="empty-state" style="padding:4rem;">
+          <div class="empty-icon">❌</div>
+          <h3>Vaga não encontrada</h3>
+          <p style="margin-bottom:1.5rem;">Esta vaga pode ter sido removida ou não existe.</p>
+          <a href="jobs.html" class="btn btn-primary">Ver todas as vagas</a>
+        </div>`;
+    } else {
+      document.title = `${job.title} - Impulsiona Vagas`;
+      const initials = getInitials(job.company);
+      const user = Auth.getUser();
+      const hasApplied = user && user.type === 'candidate' ? Applications.hasApplied(job.id, user.id) : false;
+      const resume = user && user.type === 'candidate' ? Resume.getByUserId(user.id) : null;
+
+      document.getElementById('job-detail-content').innerHTML = `
+        <div class="job-detail-header">
+          <div class="jd-top">
+            <div class="jd-logo">${initials}</div>
+            <div>
+              <h1 class="jd-title">${job.title}</h1>
+              <p class="jd-company">${job.company}</p>
+              <div class="jd-meta">
+                <span>📍 ${job.location}</span>
+                <span>${getRegimeIcon(job.regime)} ${job.regime}</span>
+                <span>📋 ${job.type}</span>
+                <span>📊 ${job.experience}</span>
+                <span>🎓 ${job.education}</span>
+                <span>📅 Publicada em ${formatDate(job.createdAt)}</span>
+              </div>
+              <div style="margin-top:10px;">
+                ${job.urgent ? '<span class="badge badge-urgent">Urgente</span>' : ''}
+                ${job.featured ? '<span class="badge badge-featured">Destaque</span>' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="job-detail-body">
+          <div class="jd-main">
+            <div class="jd-section">
+              <h3>Descrição da vaga</h3>
+              <p>${job.description}</p>
+            </div>
+            <div class="jd-section">
+              <h3>Requisitos</h3>
+              <ul>${job.requirements ? job.requirements.map(r => `<li>${r}</li>`).join('') : ''}</ul>
+            </div>
+            <div class="jd-section">
+              <h3>Benefícios</h3>
+              <ul>${job.benefits ? job.benefits.map(b => `<li>${b}</li>`).join('') : ''}</ul>
+            </div>
+            <div class="jd-section">
+              <h3>Sobre a empresa</h3>
+              <p><strong>${job.company}</strong> - Empresa atuante no segmento de ${job.category}.
+              Trabalhamos com inovação e foco em resultados, oferecendo um ambiente colaborativo e de crescimento profissional.</p>
+            </div>
+          </div>
+          <div class="jd-sidebar">
+            <div class="jd-salary">
+              <div class="salary-label">Faixa salarial</div>
+              <div class="salary-value">${job.salary}</div>
+            </div>
+            <div class="jd-section">
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                ${hasApplied
+                  ? `<button class="btn btn-secondary btn-block" disabled>Já candidatado ✓</button>
+                     <button class="btn btn-outline btn-block" onclick="window.location.href='messages.html?user=${job.companyId}&job=${job.id}'">💬 Enviar mensagem à empresa</button>`
+                  : user && user.type === 'candidate'
+                    ? `<button class="btn btn-primary btn-block btn-lg" onclick="openApplyModal()">Candidatar-se agora</button>`
+                    : user && user.type === 'company'
+                      ? ''
+                      : `<a href="login.html" class="btn btn-primary btn-block btn-lg">Faça login para candidatar</a>`
+                }
+                ${user && user.type === 'candidate' ? `
+                  <button class="btn btn-outline btn-block" onclick="saveJob('${job.id}')">☆ Salvar vaga</button>
+                ` : ''}
+              </div>
+            </div>
+            <div class="jd-section">
+              <h3>Resumo da vaga</h3>
+              <div style="display:flex; flex-direction:column; gap:12px; font-size:0.9rem;">
+                <div><strong>Departamento:</strong> ${job.department || ''}</div>
+                <div><strong>Categoria:</strong> ${job.category}</div>
+                <div><strong>Experiência:</strong> ${job.experience}</div>
+                <div><strong>Escolaridade:</strong> ${job.education}</div>
+                <div><strong>Regime:</strong> ${job.regime}</div>
+                <div><strong>Tipo:</strong> ${job.type}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    let _applyPdfData = null;
+    let _applyPdfName = '';
+
+    function openApplyModal() {
+      const user = Auth.getUser();
+      if (!user) { window.location.href = 'login.html'; return; }
+      const resume = Resume.getByUserId(user.id);
+      const body = document.getElementById('apply-modal-body');
+      _applyPdfData = null;
+      _applyPdfName = '';
+
+      if (!resume) {
+        body.innerHTML = `
+          <div class="empty-state" style="padding:1rem;">
+            <div class="empty-icon">📄</div>
+            <h3>Você ainda não tem currículo</h3>
+            <p style="margin-bottom:1rem;">Crie seu currículo antes de se candidatar.</p>
+            <a href="resume.html" class="btn btn-primary">Criar currículo</a>
+          </div>
+        `;
+      } else {
+        body.innerHTML = `
+          <p style="margin-bottom:1rem; color:var(--text-light);">Enviando currículo: <strong>${resume.title || 'Sem título'}</strong></p>
+          <div class="form-group">
+            <label for="resume-pdf">Currículo em PDF *</label>
+            <div class="file-upload" id="file-upload-area" onclick="document.getElementById('resume-pdf').click()">
+              <input type="file" id="resume-pdf" accept=".pdf" style="display:none" onchange="handlePdfUpload(event)">
+              <div class="file-upload-content">
+                <div class="file-upload-icon">📎</div>
+                <div class="file-upload-text">Arraste um arquivo PDF ou clique para selecionar</div>
+                <div class="file-upload-hint">Apenas arquivos PDF (máx. 5MB)</div>
+              </div>
+            </div>
+            <div id="file-upload-error" style="color:var(--danger); font-size:0.8rem; margin-top:4px; display:none;"></div>
+          </div>
+          <div class="form-group">
+            <label for="cover-letter">Carta de apresentação (opcional)</label>
+            <textarea id="cover-letter" rows="5" placeholder="Conte por que você é ideal para esta vaga..."></textarea>
+          </div>
+        `;
+      }
+      document.getElementById('apply-modal').classList.add('show');
+    }
+
+    function handlePdfUpload(event) {
+      const file = event.target.files[0];
+      const errorEl = document.getElementById('file-upload-error');
+      const areaEl = document.getElementById('file-upload-area');
+      errorEl.style.display = 'none';
+
+      if (!file) return;
+
+      if (file.type !== 'application/pdf') {
+        errorEl.textContent = 'Apenas arquivos PDF são aceitos.';
+        errorEl.style.display = 'block';
+        event.target.value = '';
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        errorEl.textContent = 'O arquivo deve ter no máximo 5MB.';
+        errorEl.style.display = 'block';
+        event.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        _applyPdfData = e.target.result;
+        _applyPdfName = file.name;
+        areaEl.classList.add('file-upload-success');
+        areaEl.querySelector('.file-upload-content').innerHTML = `
+          <div class="file-upload-icon">✅</div>
+          <div class="file-upload-text">${file.name}</div>
+          <div class="file-upload-hint">${(file.size / 1024).toFixed(1)} KB · Clique para trocar</div>
+        `;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function submitApplication() {
+      const user = Auth.getUser();
+      const resume = Resume.getByUserId(user.id);
+      if (!resume) { showToast('Crie seu currículo primeiro', 'error'); return; }
+
+      if (!_applyPdfData) {
+        const errorEl = document.getElementById('file-upload-error');
+        if (errorEl) {
+          errorEl.textContent = 'Anexo de currículo em PDF é obrigatório.';
+          errorEl.style.display = 'block';
+        }
+        showToast('Anexe seu currículo em PDF', 'error');
+        return;
+      }
+
+      const coverLetter = document.getElementById('cover-letter')?.value || '';
+      const result = Applications.apply(jobId, resume.id, coverLetter, _applyPdfData, _applyPdfName);
+      if (result.success) {
+        showToast('Candidatura enviada com sucesso!', 'success');
+        closeModal('apply-modal');
+        setTimeout(() => location.reload(), 600);
+      } else {
+        showToast(result.error, 'error');
+      }
+    }
+
+    function saveJob(id) { showToast('Vaga salva!', 'success'); }
+
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+    Sync.on('jobs', () => {
+      const updated = Jobs.getById(jobId);
+      if (!updated) {
+        Live.showUpdateBanner('Esta vaga foi removida', () => location.href = 'jobs.html');
+      } else if (updated.status !== 'active') {
+        Live.showUpdateBanner('Esta vaga foi pausada', () => location.href = 'jobs.html');
+      }
+    });
+    Sync.on('applications', () => renderNavbar());
+    Live.register('job-detail', { refresh: () => renderNavbar() });
+    Live.start(5000);
+  </script>
+</body>
+</html>
+

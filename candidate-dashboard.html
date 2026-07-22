@@ -1,0 +1,165 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel do Candidato - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <div class="dashboard">
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="candidate-dashboard.html" class="active">📊 Painel</a></li>
+        <li><a href="resume.html">📄 Meu Currículo</a></li>
+        <li><a href="my-applications.html">📋 Candidaturas</a></li>
+        <li><a href="jobs.html">🔍 Buscar Vagas</a></li>
+        <li><a href="messages.html">💬 Mensagens</a></li>
+        <li><a href="notifications.html">🔔 Notificações</a></li>
+        <li><button onclick="Auth.logout()">🚪 Sair</button></li>
+        <li style="margin-top:auto; padding-top:1rem; border-top:1px solid var(--border);"><button onclick="Auth.deleteAccount()" style="color:var(--danger);">🗑 Excluir conta</button></li>
+      </ul>
+    </aside>
+
+    <main class="dashboard-content" id="dash-content"></main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const user = Auth.getUser();
+    if (!user || user.type !== 'candidate') { window.location.href = 'login.html'; }
+
+    let _candDashHash = '';
+    function refreshCandDash() {
+      const stats = Applications.getStats(user.id);
+      const resume = Resume.getByUserId(user.id);
+      const resumeCompletion = Resume.getCompletion(resume);
+      const recentApps = Applications.getByUser(user.id).slice(0, 5);
+      const savedJobs = Jobs.getAll().slice(0, 3);
+
+      const newHash = JSON.stringify(stats) + recentApps.map(a => a.id + a.status).join(',');
+      if (newHash === _candDashHash) { renderNavbar(); return; }
+      _candDashHash = newHash;
+
+      document.getElementById('dash-content').innerHTML = `
+      <h1 style="margin-bottom:0.5rem;">Olá, ${user.name.split(' ')[0]}! 👋 <span class="live-dot" title="Atualização em tempo real"></span></h1>
+      <p style="color:var(--text-light); margin-bottom:2rem;">Gerencie suas candidaturas e acompanhe seu progresso</p>
+
+      <div class="dash-stats">
+        <div class="dash-stat-card">
+          <div class="stat-icon blue">📋</div>
+          <div class="stat-value">${stats.total}</div>
+          <div class="stat-title">Total de candidaturas</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-icon orange">⏳</div>
+          <div class="stat-value">${stats.pending}</div>
+          <div class="stat-title">Pendentes</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-icon green">✅</div>
+          <div class="stat-value">${stats.accepted}</div>
+          <div class="stat-title">Aceitas</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-icon red">❌</div>
+          <div class="stat-value">${stats.rejected}</div>
+          <div class="stat-title">Rejeitadas</div>
+        </div>
+      </div>
+
+      ${!resume ? `
+        <div class="card card-body" style="background:linear-gradient(135deg,#fff3e6,#ffe8d6); border-left:4px solid var(--accent); margin-bottom:2rem;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
+            <div>
+              <h3 style="margin-bottom:4px;">Complete seu currículo</h3>
+              <p style="color:var(--text-light); font-size:0.9rem;">Um currículo completo aumenta suas chances em até 5x!</p>
+            </div>
+            <a href="resume.html" class="btn btn-accent">Criar currículo agora</a>
+          </div>
+        </div>
+      ` : `
+        <div class="card card-body" style="margin-bottom:2rem;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+            <h3 style="font-size:1rem;">Completude do currículo</h3>
+            <span style="font-weight:700; color:var(--primary);">${resumeCompletion}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${resumeCompletion}%;"></div>
+          </div>
+          <div style="margin-top:10px;">
+            <a href="resume.html" class="btn btn-outline btn-sm">Editar currículo</a>
+          </div>
+        </div>
+      `}
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+        <div>
+          <h3 style="margin-bottom:1rem;">Suas últimas candidaturas</h3>
+          ${recentApps.length === 0
+            ? '<div class="card card-body"><div class="empty-state" style="padding:1rem;"><p>Nenhuma candidatura ainda</p><a href="jobs.html" class="btn btn-primary btn-sm" style="margin-top:10px;">Buscar vagas</a></div></div>'
+            : recentApps.map(a => {
+                const job = Jobs.getById(a.jobId);
+                if (!job) return '';
+                return `
+                  <div class="application-card">
+                    <div class="app-info">
+                      <h4 style="font-size:0.95rem;"><a href="job-detail.html?id=${job.id}">${job.title}</a></h4>
+                      <p>${job.company} · ${formatDate(a.appliedAt)}</p>
+                    </div>
+                    <div class="app-status" style="text-align:right;">
+                      <span class="tag ${getStatusClass(a.status)}">${getStatusText(a.status)}</span>
+                      <div style="margin-top:6px;">
+                        <a href="messages.html?user=${job.companyId}&job=${job.id}" class="btn btn-sm btn-outline" style="font-size:0.75rem;">💬 Mensagem</a>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')
+          }
+          ${recentApps.length > 0 ? '<a href="my-applications.html" style="display:block; text-align:center; margin-top:1rem; font-size:0.9rem; color:var(--primary); font-weight:600;">Ver todas →</a>' : ''}
+        </div>
+
+        <div>
+          <h3 style="margin-bottom:1rem;">Vagas recomendadas</h3>
+          ${savedJobs.map(j => {
+            const initials = getInitials(j.company);
+            return `
+              <div class="card job-card" style="margin-bottom:0.75rem;">
+                <div class="job-logo" style="width:44px;height:44px;font-size:0.9rem;">${initials}</div>
+                <div class="job-info">
+                  <div class="job-title" style="font-size:0.95rem;" onclick="location.href='job-detail.html?id=${j.id}'">${j.title}</div>
+                  <div class="job-company" style="font-size:0.8rem;">${j.company}</div>
+                  <div class="job-meta" style="margin-top:4px;">
+                    <span>${j.location}</span>
+                    <span>${j.salary}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+          <a href="jobs.html" style="display:block; text-align:center; margin-top:1rem; font-size:0.9rem; color:var(--primary); font-weight:600;">Explorar mais vagas →</a>
+        </div>
+      </div>
+    `;
+    renderNavbar();
+    }
+
+    refreshCandDash();
+
+    Sync.on('applications', () => { _candDashHash = ''; refreshCandDash(); });
+    Sync.on('jobs', () => { _candDashHash = ''; refreshCandDash(); });
+    Sync.on('notifications', () => { renderNavbar(); });
+    Sync.on('messages', () => { renderNavbar(); });
+    Live.register('cand-dash', { refresh: () => { _candDashHash = ''; refreshCandDash(); } });
+    Live.start(3000);
+  </script>
+</body>
+</html>
+

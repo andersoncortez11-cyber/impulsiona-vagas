@@ -1,0 +1,272 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minhas Vagas - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <div class="dashboard">
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="company-dashboard.html">📊 Painel</a></li>
+        <li><a href="company-jobs.html" class="active">💼 Minhas Vagas</a></li>
+        <li><a href="create-job.html">➕ Nova Vaga</a></li>
+        <li><a href="company-applications.html">📩 Candidaturas</a></li>
+        <li><a href="messages.html">💬 Mensagens</a></li>
+        <li><button onclick="Auth.logout()">🚪 Sair</button></li>
+      </ul>
+    </aside>
+
+    <main class="dashboard-content">
+      <div class="page-header">
+        <h1>Minhas Vagas</h1>
+        <a href="create-job.html" class="btn btn-primary">➕ Nova Vaga</a>
+      </div>
+      <div id="my-jobs-list"></div>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const user = Auth.getUser();
+    if (!user || user.type !== 'company') { window.location.href = 'login.html'; }
+    if (user && !Auth.hasActiveSubscription()) { window.location.href = 'company-dashboard.html'; }
+
+    let _myJobsHash = '';
+    function renderMyJobs() {
+      const jobs = Jobs.getCompanyJobs(user.id);
+      const el = document.getElementById('my-jobs-list');
+      if (jobs.length === 0) {
+        el.innerHTML = `<div class="card card-body"><div class="empty-state"><div class="empty-icon">💼</div><h3>Nenhuma vaga publicada</h3><a href="create-job.html" class="btn btn-primary" style="margin-top:1rem;">Publicar primeira vaga</a></div></div>`;
+        return;
+      }
+
+      const newHash = jobs.map(j => j.id + j.status).join(',');
+      if (newHash !== _myJobsHash) {
+        _myJobsHash = newHash;
+        let rows = '';
+        for (const j of jobs) {
+          const apps = Applications.getByJob(j.id);
+          const appCount = apps.length;
+          const pdfCount = apps.filter(a => a.resumePdf).length;
+          rows += `
+            <tr>
+              <td>
+                <strong>${j.title}</strong><br>
+                <span style="font-size:0.8rem; color:var(--text-muted);">${j.location} · ${j.regime} · ${j.type}</span>
+              </td>
+              <td>
+                <span style="font-weight:600;">${appCount}</span>
+                ${pdfCount > 0 ? `<br><span style="font-size:0.75rem; color:var(--secondary);">📄 ${pdfCount} PDF${pdfCount > 1 ? 's' : ''}</span>` : ''}
+              </td>
+              <td><span class="tag ${j.status === 'active' ? 'tag-green' : 'tag-gray'}">${j.status === 'active' ? 'Ativa' : 'Pausada'}</span></td>
+              <td>${formatDate(j.createdAt)}</td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn btn-sm btn-outline" onclick="viewJobApplicants('${j.id}')">Ver</button>
+                  <button class="btn btn-sm btn-outline" onclick="editJobModal('${j.id}')">Editar</button>
+                  <button class="btn btn-sm btn-outline" onclick="toggleJobStatus('${j.id}', '${j.status}')">${j.status === 'active' ? 'Pausar' : 'Ativar'}</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteJob('${j.id}')">Excluir</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+        el.innerHTML = `<div class="table-container"><table>
+          <thead><tr><th>Vaga</th><th>Candidaturas</th><th>Status</th><th>Criada em</th><th>Ações</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      }
+      renderNavbar();
+    }
+
+    function viewJobApplicants(jobId) {
+      const job = Jobs.getById(jobId);
+      if (!job) return;
+      const apps = Applications.getByJob(jobId);
+      apps.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      const users = DB.get('users');
+
+      const pdfApps = apps.filter(a => a.resumePdf);
+
+      let applicantsHTML = '';
+      if (apps.length === 0) {
+        applicantsHTML = '<div class="empty-state" style="padding:2rem;"><div class="empty-icon">📭</div><h3>Nenhuma candidatura ainda</h3></div>';
+      } else {
+        let downloadBar = '';
+        if (pdfApps.length > 1) {
+          downloadBar = `
+            <div class="download-all-bar">
+              <span>📄 ${pdfApps.length} currículos em PDF</span>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                ${pdfApps.map(a => {
+                  const cand = users.find(u => u.id === a.userId);
+                  const name = cand ? cand.name.replace(/\s/g, '_') : 'candidato';
+                  return `<a href="${a.resumePdf}" download="${a.resumePdfName || 'curriculo_' + name + '.pdf'}" class="btn btn-sm btn-primary">⬇ ${cand ? cand.name.split(' ')[0] : 'PDF'}</a>`;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        applicantsHTML = downloadBar + apps.map(a => {
+          const candidate = users.find(u => u.id === a.userId);
+          if (!candidate) return '';
+          const fileName = a.resumePdfName || 'curriculo_' + candidate.name.replace(/\s/g, '_') + '.pdf';
+          return `
+            <div class="applicant-card">
+              <div class="applicant-header">
+                <div class="applicant-info">
+                  <div class="applicant-avatar">${getInitials(candidate.name)}</div>
+                  <div>
+                    <strong>${candidate.name}</strong>
+                    <br><span style="font-size:0.8rem; color:var(--text-muted);">${candidate.email}</span>
+                    <br><span style="font-size:0.75rem; color:var(--text-muted);">Candidatura em ${formatDate(a.appliedAt)}</span>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  ${a.resumePdf ? `<a href="${a.resumePdf}" download="${fileName}" class="btn btn-sm btn-primary">⬇ Baixar PDF</a>` : ''}
+                  <span class="tag ${getStatusClass(a.status)}">${getStatusText(a.status)}</span>
+                </div>
+              </div>
+              ${a.coverLetter ? `<div class="applicant-cover"><strong>Carta:</strong> <span style="font-style:italic;">"${a.coverLetter.substring(0, 150)}${a.coverLetter.length > 150 ? '...' : ''}"</span></div>` : ''}
+              ${a.resumePdf ? `
+                <div class="applicant-pdf">
+                  <div class="pdf-viewer-container">
+                    <iframe src="${a.resumePdf}" title="Currículo PDF"></iframe>
+                  </div>
+                </div>
+              ` : '<div style="padding:0.75rem; font-size:0.8rem; color:var(--text-muted);">Sem PDF anexado</div>'}
+              ${a.status === 'pending' ? `
+                <div class="applicant-actions">
+                  <button class="btn btn-sm btn-primary" onclick="setAppStatusFromJob('${a.id}','accepted','${jobId}')">Aceitar</button>
+                  <button class="btn btn-sm btn-danger" onclick="setAppStatusFromJob('${a.id}','rejected','${jobId}')">Rejeitar</button>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay show';
+      modal.innerHTML = `
+        <div class="modal" style="max-width:750px; max-height:90vh;">
+          <div class="modal-header">
+            <h3>${job.title} — Candidatos</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+          </div>
+          <div class="modal-body" style="max-height:70vh; overflow-y:auto;">
+            ${applicantsHTML}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    function setAppStatusFromJob(appId, status, jobId) {
+      Applications.updateStatus(appId, status);
+      showToast(`Candidatura ${status === 'accepted' ? 'aceita' : 'rejeitada'}!`, status === 'accepted' ? 'success' : 'info');
+      document.querySelector('.modal-overlay.show')?.remove();
+      viewJobApplicants(jobId);
+    }
+
+    function toggleJobStatus(id, currentStatus) {
+      Jobs.update(id, { status: currentStatus === 'active' ? 'paused' : 'active' });
+      showToast('Status da vaga atualizado!', 'success');
+      _myJobsHash = '';
+      renderMyJobs();
+    }
+
+    function deleteJob(id) {
+      if (confirm('Tem certeza que deseja excluir esta vaga?')) {
+        Jobs.delete(id);
+        showToast('Vaga excluída', 'info');
+        _myJobsHash = '';
+        renderMyJobs();
+      }
+    }
+
+    function editJobModal(id) {
+      const job = Jobs.getById(id);
+      if (!job) return;
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay show';
+      modal.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <h3>Editar vaga</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group"><label>Título</label><input type="text" id="edit-title" value="${job.title}"></div>
+            <div class="form-group"><label>Descrição</label><textarea id="edit-desc" rows="3">${job.description}</textarea></div>
+            <div class="form-group"><label>Salário</label><input type="text" id="edit-salary" value="${job.salary}"></div>
+            <div class="form-row">
+              <div class="form-group"><label>Localização</label><input type="text" id="edit-location" value="${job.location}"></div>
+              <div class="form-group">
+                <label>Regime</label>
+                <select id="edit-regime">
+                  <option ${job.regime==='Presencial'?'selected':''}>Presencial</option>
+                  <option ${job.regime==='Remoto'?'selected':''}>Remoto</option>
+                  <option ${job.regime==='Híbrido'?'selected':''}>Híbrido</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveJobEdit('${id}')">Salvar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    function saveJobEdit(id) {
+      Jobs.update(id, {
+        title: document.getElementById('edit-title').value,
+        description: document.getElementById('edit-desc').value,
+        salary: document.getElementById('edit-salary').value,
+        location: document.getElementById('edit-location').value,
+        regime: document.getElementById('edit-regime').value,
+      });
+      document.querySelector('.modal-overlay.show').remove();
+      showToast('Vaga atualizada!', 'success');
+      _myJobsHash = '';
+      renderMyJobs();
+    }
+
+    renderMyJobs();
+
+    Sync.on('jobs', () => { _myJobsHash = ''; renderMyJobs(); });
+    Sync.on('applications', () => {
+      _myJobsHash = '';
+      renderMyJobs();
+      const openModal = document.querySelector('.modal-overlay.show');
+      if (openModal) {
+        const titleEl = openModal.querySelector('.modal-header h3');
+        if (titleEl) {
+          const jobs = Jobs.getCompanyJobs(user.id);
+          const matchJob = jobs.find(j => titleEl.textContent.includes(j.title));
+          if (matchJob) {
+            openModal.remove();
+            viewJobApplicants(matchJob.id);
+          }
+        }
+      }
+    });
+    Live.register('company-jobs', { refresh: () => { _myJobsHash = ''; renderMyJobs(); } });
+    Live.start(3000);
+  </script>
+</body>
+</html>
+

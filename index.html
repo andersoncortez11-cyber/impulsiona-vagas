@@ -1,0 +1,179 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Impulsiona Vagas - Encontre sua próxima oportunidade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <section class="hero">
+    <h1>Encontre a vaga perfeita para você</h1>
+    <p>Centenas de oportunidades das melhores empresas do Brasil</p>
+    <div class="hero-search">
+      <input type="text" id="hero-search-input" placeholder="Cargo, empresa ou palavra-chave...">
+      <select id="hero-search-location">
+        <option value="">Todas as cidades</option>
+        <option value="São Paulo">São Paulo</option>
+        <option value="Rio de Janeiro">Rio de Janeiro</option>
+        <option value="Belo Horizonte">Belo Horizonte</option>
+        <option value="Curitiba">Curitiba</option>
+        <option value="Recife">Recife</option>
+        <option value="Remoto">Remoto</option>
+      </select>
+      <button onclick="heroSearch()">Buscar Vagas</button>
+    </div>
+  </section>
+
+  <div class="stats-bar" id="stats-bar"></div>
+
+  <section class="container">
+    <div class="page-header">
+      <h1>Vagas em destaque</h1>
+      <a href="jobs.html" class="btn btn-outline">Ver todas as vagas</a>
+    </div>
+    <div id="featured-notice" style="margin-bottom:1rem; font-size:0.8rem; color:var(--text-muted);"></div>
+    <div class="job-list" id="featured-jobs"></div>
+
+    <div style="margin-top:3rem;">
+      <div class="page-header">
+        <h1>Categorias populares</h1>
+      </div>
+      <div class="categories-grid" id="categories-grid"></div>
+    </div>
+
+    <div style="margin-top:3rem; margin-bottom:1rem;">
+      <div style="max-width:500px; margin:0 auto;">
+        <div class="card" style="padding:2.5rem; text-align:center; border:2px solid var(--primary); position:relative; transition:var(--transition); transform:scale(1.02);">
+          <div style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--primary); color:#fff; padding:4px 16px; border-radius:20px; font-size:0.75rem; font-weight:700;">Acesso completo</div>
+          <div style="font-size:2.5rem; margin-bottom:0.5rem;">🏢</div>
+          <h2 style="margin-bottom:0.25rem;">Plano Empresa</h2>
+          <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1.5rem;">Acesso ilimitado para encontrar os melhores candidatos</p>
+          <div style="font-size:3rem; font-weight:800; color:var(--primary); margin-bottom:0.25rem;">R$ 49,99</div>
+          <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:2rem;">por mês · cobrança recorrente via Mercado Pago</p>
+          <ul style="text-align:left; list-style:none; margin-bottom:2rem;">
+            <li style="padding:0.5rem 0; font-size:0.95rem; border-bottom:1px solid var(--bg);">✅ Publicar vagas ilimitadas</li>
+            <li style="padding:0.5rem 0; font-size:0.95rem; border-bottom:1px solid var(--bg);">✅ Receber candidaturas ilimitadas</li>
+            <li style="padding:0.5rem 0; font-size:0.95rem; border-bottom:1px solid var(--bg);">✅ Painel de controle completo</li>
+            <li style="padding:0.5rem 0; font-size:0.95rem; border-bottom:1px solid var(--bg);">✅ Vagas em destaque</li>
+            <li style="padding:0.5rem 0; font-size:0.95rem; border-bottom:1px solid var(--bg);">✅ Mensagens com candidatos</li>
+            <li style="padding:0.5rem 0; font-size:0.95rem;">✅ Suporte por email</li>
+          </ul>
+          <a href="register.html" class="btn btn-primary btn-lg btn-block">Assinar plano mensal</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+
+    function heroSearch() {
+      const q = document.getElementById('hero-search-input').value;
+      const loc = document.getElementById('hero-search-location').value;
+      let url = 'jobs.html?';
+      if (q) url += 'q=' + encodeURIComponent(q) + '&';
+      if (loc) url += 'location=' + encodeURIComponent(loc);
+      window.location.href = url;
+    }
+
+    document.getElementById('hero-search-input').addEventListener('keypress', e => {
+      if (e.key === 'Enter') heroSearch();
+    });
+
+    function renderJobCard(j) {
+      const initials = getInitials(j.company);
+      return `
+        <div class="card job-card">
+          <div class="job-logo">${initials}</div>
+          <div class="job-info">
+            <div class="job-title" onclick="location.href='job-detail.html?id=${j.id}'">${j.title}</div>
+            <div class="job-company">${j.company}</div>
+            <div class="job-meta">
+              <span>${getRegimeIcon(j.regime)} ${j.regime}</span>
+              <span>📍 ${j.location}</span>
+              <span>💰 ${j.salary}</span>
+              <span>📋 ${j.type}</span>
+            </div>
+            <div class="job-tags">
+              ${j.requirements ? j.requirements.slice(0, 4).map(r => `<span class="tag tag-blue">${r}</span>`).join('') : ''}
+              ${j.requirements && j.requirements.length > 4 ? `<span class="tag tag-gray">+${j.requirements.length - 4}</span>` : ''}
+            </div>
+          </div>
+          <div style="text-align:right; flex-shrink:0;">
+            ${j.urgent ? '<span class="badge badge-urgent">Urgente</span>' : ''}
+            ${j.featured ? '<span class="badge badge-featured" style="margin-top:4px;">Destaque</span>' : ''}
+            <div style="margin-top:8px; font-size:0.75rem; color:var(--text-muted);">${timeAgo(j.createdAt)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    let _homeStatsHash = '';
+    let _homeFeatHash = '', _homeCatHash = '';
+
+    function refreshHome() {
+      const stats = Jobs.getStatsGlobal();
+      const newStatsHash = JSON.stringify(stats);
+      if (newStatsHash !== _homeStatsHash) {
+        _homeStatsHash = newStatsHash;
+        document.getElementById('stats-bar').innerHTML = `
+          <div class="stat-item"><div class="stat-num">${stats.totalJobs}</div><div class="stat-label">Vagas ativas</div></div>
+          <div class="stat-item"><div class="stat-num">${stats.totalCompanies}</div><div class="stat-label">Empresas</div></div>
+          <div class="stat-item"><div class="stat-num">${stats.totalCandidates}</div><div class="stat-label">Candidatos</div></div>
+          <div class="stat-item"><div class="stat-num">${stats.totalApplications}</div><div class="stat-label">Candidaturas</div></div>
+        `;
+      }
+
+      const allJobs = Jobs.getAll();
+      const featured = allJobs.slice(0, 6);
+      const featuredEl = document.getElementById('featured-jobs');
+      const noticeEl = document.getElementById('featured-notice');
+      const newFeaturedHash = featured.map(j => j.id + j.status).join(',');
+      if (newFeaturedHash !== _homeFeatHash) {
+        _homeFeatHash = newFeaturedHash;
+        if (allJobs.length === 0) {
+          noticeEl.textContent = '';
+          featuredEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>Nenhuma vaga publicada ainda</h3><p>Empresas cadastradas podem publicar vagas pelo painel.</p></div>';
+        } else {
+          noticeEl.textContent = `${allJobs.length} vaga${allJobs.length > 1 ? 's' : ''} publicada${allJobs.length > 1 ? 's' : ''} por empresas cadastradas · Atualização em tempo real`;
+          featuredEl.innerHTML = featured.map(j => renderJobCard(j)).join('');
+        }
+      }
+
+      const catCounts = Jobs.getCategoryCount();
+      const categories = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
+      const newCatHash = JSON.stringify(categories);
+      if (newCatHash !== _homeCatHash) {
+        _homeCatHash = newCatHash;
+        document.getElementById('categories-grid').innerHTML = categories.map(([cat, count]) => `
+          <div class="category-card" onclick="location.href='jobs.html?category=${encodeURIComponent(cat)}'">
+            <div class="cat-icon">${getCategoryIcon(cat)}</div>
+            <div class="cat-name">${cat}</div>
+            <div class="cat-count">${count} vaga${count > 1 ? 's' : ''}</div>
+          </div>
+        `).join('');
+      }
+
+      renderNavbar();
+    }
+
+    refreshHome();
+
+    Sync.on('jobs', () => { _homeStatsHash = ''; _homeFeatHash = ''; _homeCatHash = ''; refreshHome(); });
+    Sync.on('users', () => { _homeStatsHash = ''; _homeFeatHash = ''; refreshHome(); });
+    Sync.on('applications', () => { _homeStatsHash = ''; _homeFeatHash = ''; refreshHome(); });
+    Sync.on('sync_complete', () => { _homeStatsHash = ''; _homeFeatHash = ''; _homeCatHash = ''; refreshHome(); });
+
+    Live.register('home', { refresh: refreshHome });
+    Live.start(3000);
+  </script>
+</body>
+</html>
+

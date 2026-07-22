@@ -1,0 +1,334 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .plan-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+    .plan-card {
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      cursor: pointer;
+      transition: var(--transition);
+      text-align: center;
+      position: relative;
+    }
+    .plan-card:hover { border-color: var(--primary); }
+    .plan-card.selected { border-color: var(--primary); background: var(--primary-lighter); }
+    .plan-card .plan-badge {
+      position: absolute;
+      top: -10px;
+      right: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+    }
+    .plan-card .plan-name { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
+    .plan-card .plan-price { font-size: 1.5rem; font-weight: 800; color: var(--primary); letter-spacing: -0.03em; }
+    .plan-card .plan-period { font-size: 0.8rem; color: var(--text-light); }
+    .plan-card .plan-features { text-align: left; margin-top: 1rem; font-size: 0.8rem; color: var(--text-light); }
+    .plan-card .plan-features li { margin-bottom: 4px; list-style: none; }
+    .plan-card .plan-features li::before { content: "✓ "; color: var(--secondary); font-weight: 700; }
+    .payment-form { background: var(--bg); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem; }
+    .payment-form h3 { font-size: 1rem; margin-bottom: 1rem; }
+    .step-indicator { display: flex; justify-content: center; gap: 8px; margin-bottom: 1.5rem; }
+    .step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+    .step-dot.active { background: var(--primary); }
+    .step-dot.done { background: var(--secondary); }
+  </style>
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <div class="auth-container" style="max-width:520px;">
+    <div class="auth-card">
+      <h2>Crie sua conta</h2>
+      <p class="subtitle">Escolha o tipo de cadastro</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchTab('candidate', this)">Sou Candidato</button>
+        <button class="auth-tab" onclick="switchTab('company', this)">Sou Empresa</button>
+      </div>
+
+      <!-- CANDIDATE FORM -->
+      <form id="register-form" onsubmit="handleRegister(event)">
+        <input type="hidden" id="user-type" value="candidate">
+
+        <div id="company-fields" class="hidden"></div>
+
+        <div id="candidate-fields">
+          <div class="form-group">
+            <label for="full-name">Nome completo</label>
+            <input type="text" id="full-name" placeholder="Seu nome completo">
+          </div>
+        </div>
+
+        <div id="common-fields">
+          <div class="form-group">
+            <label for="reg-email">Email</label>
+            <input type="email" id="reg-email" placeholder="seu@email.com" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg-password">Senha</label>
+              <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" required minlength="6">
+            </div>
+            <div class="form-group">
+              <label for="reg-password2">Confirmar senha</label>
+              <input type="password" id="reg-password2" placeholder="Repita a senha" required>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:1.5rem;">
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.85rem; cursor:pointer;">
+            <input type="checkbox" required style="margin-top:3px;">
+            Concordo com os <a href="#" style="color:var(--primary);">Termos de Uso</a> e <a href="#" style="color:var(--primary);">Política de Privacidade</a>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg">Criar conta</button>
+      </form>
+
+      <!-- COMPANY STEP 2: PLAN SELECTION -->
+      <div id="step-plan" class="hidden">
+        <div class="step-indicator">
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+          <div class="step-dot"></div>
+        </div>
+        <h2 style="text-align:center; font-size:1.25rem; margin-bottom:0.5rem;">Plano Empresa</h2>
+        <p class="subtitle">Acesso ilimitado ao painel de vagas</p>
+
+        <div class="plan-cards">
+          <div class="plan-card selected" data-plan="single" style="grid-column:1/-1; max-width:400px; margin:0 auto;">
+            <div class="plan-badge">Acesso completo</div>
+            <div class="plan-name" style="font-size:1.1rem;">Plano Empresa</div>
+            <div class="plan-price">R$ 49,99</div>
+            <div class="plan-period">por mês · cobrança recorrente via Mercado Pago</div>
+            <ul class="plan-features">
+              <li>Vagas ilimitadas</li>
+              <li>Candidaturas ilimitadas</li>
+              <li>Vagas em destaque</li>
+              <li>Mensagens com candidatos</li>
+              <li>Suporte por email</li>
+            </ul>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" onclick="goToPayment()" id="btn-plan-next">Continuar para pagamento</button>
+        <button class="btn btn-outline btn-block" onclick="backToStep1()" style="margin-top:8px;">Voltar</button>
+      </div>
+
+      <!-- COMPANY STEP 3: PAYMENT -->
+      <div id="step-payment" class="hidden">
+        <div class="step-indicator">
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+        </div>
+        <h2 style="text-align:center; font-size:1.25rem; margin-bottom:0.5rem;">Finalizar pagamento</h2>
+        <p class="subtitle" id="payment-plan-label">Plano Empresa — R$ 49,99/mês (cobrança recorrente)</p>
+
+        <div class="payment-form">
+          <div style="padding:1.5rem;">
+            <div style="text-align:center; margin-bottom:1.5rem;">
+              <div style="font-size:3rem; margin-bottom:0.5rem;">💳</div>
+              <h3 style="margin-bottom:0.25rem;">Pagamento seguro via Mercado Pago</h3>
+              <p style="color:var(--text-muted); font-size:0.85rem;">
+                Você será redirecionado para o Mercado Pago para concluir o pagamento.
+              </p>
+            </div>
+
+            <div style="background:var(--bg); border-radius:12px; padding:1.25rem; margin-bottom:1.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                <span style="font-weight:600; font-size:0.95rem;">Plano Empresa</span>
+                <span style="font-weight:700; color:var(--primary); font-size:1.1rem;">R$ 49,99</span>
+              </div>
+              <div style="font-size:0.8rem; color:var(--text-muted); border-top:1px solid var(--border); padding-top:0.75rem;">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">✅ Publicar vagas ilimitadas</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">✅ Receber candidaturas ilimitadas</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">✅ Painel de controle completo</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">✅ Mensagens com candidatos</div>
+                <div style="display:flex; align-items:center; gap:6px;">✅ Suporte por email</div>
+              </div>
+            </div>
+
+            <div style="background:#d4edda; border:1px solid #c3e6cb; border-radius:8px; padding:0.75rem; margin-bottom:1.5rem; font-size:0.8rem; color:#155724;">
+              🔒 Pagamento processado com segurança pelo Mercado Pago.<br>
+              📅 Cobrança recorrente de R$ 49,99 todo mês. Cancele quando quiser.
+            </div>
+
+            <button class="btn btn-primary btn-lg btn-block" onclick="goToMpCheckout()" id="btn-pay" style="font-size:1rem;">
+              💳 Pagar R$ 49,99/mês no Mercado Pago
+            </button>
+          </div>
+        </div>
+
+        <div id="mp-error-box" style="display:none; background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; margin-bottom:1rem; color:#721c24; font-size:0.85rem;"></div>
+        <button class="btn btn-outline btn-block" onclick="backToStep2()" style="margin-top:8px;">Voltar</button>
+      </div>
+
+      <!-- COMPANY STEP 4: SUCCESS -->
+      <div id="step-success" class="hidden">
+        <div style="text-align:center; padding:2rem 0;">
+          <div style="font-size:4rem; margin-bottom:1rem;">✅</div>
+          <h2 style="margin-bottom:0.5rem;">Pagamento aprovado!</h2>
+          <p style="color:var(--text-light); margin-bottom:1.5rem;">Sua conta foi criada e já está ativa. Você pode começar a publicar vagas agora.</p>
+          <a href="company-dashboard.html" class="btn btn-primary btn-lg">Acessar painel</a>
+        </div>
+      </div>
+
+      <div id="auth-footer">
+        <div class="auth-divider">ou</div>
+        <p style="text-align:center; font-size:0.9rem;">
+          Já tem conta? <a href="login.html" style="color:var(--primary); font-weight:600;">Fazer login</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const loggedIn = Auth.isLoggedIn();
+    if (loggedIn) {
+      const u = Auth.getUser();
+      window.location.href = u.type === 'company' ? 'company-dashboard.html' : 'candidate-dashboard.html';
+    }
+
+    let selectedPlan = null;
+    let companyData = {};
+
+    const MP_CONFIG_KEY = 'impulsiona_mp_config';
+
+    function getMpConfig() {
+      return JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+    }
+
+    function switchTab(type, btn) {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('user-type').value = type;
+      document.getElementById('company-fields').classList.toggle('hidden', type !== 'company');
+      document.getElementById('candidate-fields').classList.toggle('hidden', type !== 'candidate');
+
+      if (type === 'company') {
+        document.getElementById('company-fields').innerHTML = `
+          <div class="form-group">
+            <label for="company-name">Nome da Empresa</label>
+            <input type="text" id="company-name" placeholder="Razão social">
+          </div>
+          <div class="form-group">
+            <label for="cnpj">CNPJ</label>
+            <input type="text" id="cnpj" placeholder="00.000.000/0000-00">
+          </div>
+        `;
+      }
+    }
+
+    function handleRegister(e) {
+      e.preventDefault();
+      const type = document.getElementById('user-type').value;
+      const password = document.getElementById('reg-password').value;
+      const password2 = document.getElementById('reg-password2').value;
+
+      if (password !== password2) {
+        showToast('As senhas não coincidem', 'error');
+        return;
+      }
+
+      if (type === 'company') {
+        const name = document.getElementById('company-name').value;
+        const cnpj = document.getElementById('cnpj').value;
+        if (!name) { showToast('Preencha o nome da empresa', 'error'); return; }
+
+        companyData = {
+          email: document.getElementById('reg-email').value,
+          password: password,
+          type: 'company',
+          name: name,
+          company: name,
+          cnpj: cnpj,
+        };
+
+        document.getElementById('register-form').classList.add('hidden');
+        document.getElementById('common-fields').classList.add('hidden');
+        document.getElementById('company-fields').classList.add('hidden');
+        document.getElementById('step-plan').classList.remove('hidden');
+        document.getElementById('auth-footer').classList.add('hidden');
+      } else {
+        const data = {
+          email: document.getElementById('reg-email').value,
+          password: password,
+          type: 'candidate',
+          name: document.getElementById('full-name').value,
+        };
+        if (!data.name) { showToast('Preencha seu nome', 'error'); return; }
+
+        const result = Auth.register(data);
+        if (result.success) {
+          showToast('Conta criada com sucesso!', 'success');
+          setTimeout(() => { window.location.href = 'resume.html'; }, 500);
+        } else {
+          showToast(result.error, 'error');
+        }
+      }
+    }
+
+    function selectPlan(plan, el) {
+      selectedPlan = plan;
+    }
+
+    function goToPayment() {
+      selectedPlan = 'monthly';
+      document.getElementById('step-plan').classList.add('hidden');
+      document.getElementById('step-payment').classList.remove('hidden');
+      document.getElementById('payment-plan-label').textContent = 'Plano Empresa — R$ 49,99/mês (cobrança recorrente)';
+    }
+
+    function backToStep1() {
+      localStorage.removeItem('impulsiona_pending_company');
+      document.getElementById('step-plan').classList.add('hidden');
+      document.getElementById('step-payment').classList.add('hidden');
+      document.getElementById('register-form').classList.remove('hidden');
+      document.getElementById('common-fields').classList.remove('hidden');
+      document.getElementById('company-fields').classList.remove('hidden');
+      document.getElementById('auth-footer').classList.remove('hidden');
+    }
+
+    function backToStep2() {
+      document.getElementById('step-payment').classList.add('hidden');
+      document.getElementById('step-plan').classList.remove('hidden');
+    }
+
+    function goToMpCheckout() {
+      const config = getMpConfig();
+      const checkoutUrl = config.checkoutUrl;
+
+      if (!checkoutUrl) {
+        showToast('Link de pagamento não configurado. Acesse o painel admin (⚙).', 'error');
+        return;
+      }
+
+      localStorage.setItem('impulsiona_pending_company', JSON.stringify(companyData));
+
+      const separator = checkoutUrl.includes('?') ? '&' : '?';
+      const redirectUrl = checkoutUrl + separator + 'external_reference=' + encodeURIComponent(companyData.email);
+
+      window.location.href = redirectUrl;
+    }
+  </script>
+  </script>
+</body>
+</html>
+

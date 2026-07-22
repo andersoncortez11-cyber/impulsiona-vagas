@@ -1,0 +1,271 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meu Currículo - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <section class="container">
+    <div class="page-header">
+      <h1>Meu Currículo</h1>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline" onclick="previewResume()">👁 Visualizar</button>
+        <button class="btn btn-primary" onclick="saveResume()">💾 Salvar</button>
+      </div>
+    </div>
+
+    <div id="resume-form-content"></div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const user = Auth.getUser();
+    if (!user || user.type !== 'candidate') { window.location.href = 'login.html'; }
+
+    const existingResume = Resume.getByUserId(user.id);
+      const resume = existingResume || {
+        name: user.name, email: user.email, phone: '', title: '', summary: '',
+        experience: [], education: [], skills: [], languages: [], certifications: []
+      };
+
+      function renderForm() {
+        document.getElementById('resume-form-content').innerHTML = `
+          <div class="resume-section">
+            <div class="resume-section-header"><h3>📋 Informações pessoais</h3></div>
+            <div class="resume-section-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Nome completo</label>
+                  <input type="text" id="r-name" value="${resume.name || ''}">
+                </div>
+                <div class="form-group">
+                  <label>Email</label>
+                  <input type="email" id="r-email" value="${resume.email || ''}">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Telefone</label>
+                  <input type="text" id="r-phone" value="${resume.phone || ''}" placeholder="(00) 00000-0000">
+                </div>
+                <div class="form-group">
+                  <label>Título profissional</label>
+                  <input type="text" id="r-title" value="${resume.title || ''}" placeholder="Ex: Desenvolvedor Full Stack">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Resumo profissional</label>
+                <textarea id="r-summary" rows="4" placeholder="Descreva brevemente sua trajetória e objetivos profissionais">${resume.summary || ''}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="resume-section">
+            <div class="resume-section-header">
+              <h3>💼 Experiência profissional</h3>
+              <button class="btn btn-sm btn-outline" onclick="addExperience()">+ Adicionar</button>
+            </div>
+            <div class="resume-section-body" id="experience-list">
+              ${(resume.experience || []).map((e, i) => `
+                <div class="exp-item" style="border:1px solid var(--border); border-radius:var(--radius); padding:1rem; margin-bottom:1rem;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <strong>Experiência ${i + 1}</strong>
+                    <button class="btn btn-sm btn-danger" onclick="removeExperience(${i})">Remover</button>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group"><label>Empresa</label><input type="text" class="exp-company" value="${e.company || ''}"></div>
+                    <div class="form-group"><label>Cargo</label><input type="text" class="exp-role" value="${e.role || ''}"></div>
+                  </div>
+                  <div class="form-group"><label>Período</label><input type="text" class="exp-period" value="${e.period || ''}" placeholder="MM/AAAA - MM/AAAA"></div>
+                  <div class="form-group"><label>Descrição</label><textarea class="exp-desc" rows="2">${e.description || ''}</textarea></div>
+                </div>
+              `).join('')}
+              ${(!resume.experience || resume.experience.length === 0) ? '<p style="color:var(--text-muted);">Nenhuma experiência adicionada ainda</p>' : ''}
+            </div>
+          </div>
+
+          <div class="resume-section">
+            <div class="resume-section-header">
+              <h3>🎓 Formação acadêmica</h3>
+              <button class="btn btn-sm btn-outline" onclick="addEducation()">+ Adicionar</button>
+            </div>
+            <div class="resume-section-body" id="education-list">
+              ${(resume.education || []).map((e, i) => `
+                <div class="edu-item" style="border:1px solid var(--border); border-radius:var(--radius); padding:1rem; margin-bottom:1rem;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <strong>Formação ${i + 1}</strong>
+                    <button class="btn btn-sm btn-danger" onclick="removeEducation(${i})">Remover</button>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group"><label>Instituição</label><input type="text" class="edu-inst" value="${e.institution || ''}"></div>
+                    <div class="form-group"><label>Curso</label><input type="text" class="edu-course" value="${e.course || ''}"></div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group"><label>Período</label><input type="text" class="edu-period" value="${e.period || ''}"></div>
+                    <div class="form-group">
+                      <label>Nível</label>
+                      <select class="edu-level">
+                        <option value="Fundamental" ${e.level === 'Fundamental' ? 'selected' : ''}>Fundamental</option>
+                        <option value="Médio" ${e.level === 'Médio' ? 'selected' : ''}>Médio</option>
+                        <option value="Cursando superior" ${e.level === 'Cursando superior' ? 'selected' : ''}>Cursando superior</option>
+                        <option value="Superior" ${e.level === 'Superior' ? 'selected' : ''}>Superior completo</option>
+                        <option value="Pós-graduação" ${e.level === 'Pós-graduação' ? 'selected' : ''}>Pós-graduação</option>
+                        <option value="Mestrado" ${e.level === 'Mestrado' ? 'selected' : ''}>Mestrado</option>
+                        <option value="Doutorado" ${e.level === 'Doutorado' ? 'selected' : ''}>Doutorado</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+              ${(!resume.education || resume.education.length === 0) ? '<p style="color:var(--text-muted);">Nenhuma formação adicionada ainda</p>' : ''}
+            </div>
+          </div>
+
+          <div class="resume-section">
+            <div class="resume-section-header"><h3>🛠 Habilidades</h3></div>
+            <div class="resume-section-body">
+              <div class="form-group">
+                <label>Adicione suas habilidades (separadas por vírgula)</label>
+                <textarea id="r-skills" rows="3" placeholder="Ex: JavaScript, React, Python, SQL, Git...">${(resume.skills || []).join(', ')}</textarea>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:0.5rem;">
+                ${(resume.skills || []).map(s => `<span class="tag tag-blue">${s}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="resume-section">
+            <div class="resume-section-header"><h3>🌐 Idiomas</h3></div>
+            <div class="resume-section-body" id="languages-list">
+              ${(resume.languages || []).map((l, i) => `
+                <div class="form-row" style="margin-bottom:0.75rem; align-items:flex-end;">
+                  <div class="form-group"><label>Idioma</label><input type="text" class="lang-name" value="${l.name || ''}"></div>
+                  <div class="form-group">
+                    <label>Nível</label>
+                    <select class="lang-level">
+                      <option value="Básico" ${l.level === 'Básico' ? 'selected' : ''}>Básico</option>
+                      <option value="Intermediário" ${l.level === 'Intermediário' ? 'selected' : ''}>Intermediário</option>
+                      <option value="Avançado" ${l.level === 'Avançado' ? 'selected' : ''}>Avançado</option>
+                      <option value="Fluente" ${l.level === 'Fluente' ? 'selected' : ''}>Fluente</option>
+                      <option value="Nativo" ${l.level === 'Nativo' ? 'selected' : ''}>Nativo</option>
+                    </select>
+                  </div>
+                  <button class="btn btn-sm btn-danger" onclick="removeLanguage(${i})" style="height:38px;">X</button>
+                </div>
+              `).join('')}
+              <button class="btn btn-sm btn-outline" onclick="addLanguage()">+ Adicionar idioma</button>
+            </div>
+          </div>
+
+          <div class="resume-section">
+            <div class="resume-section-header"><h3>📜 Certificações</h3></div>
+            <div class="resume-section-body">
+              <div class="form-group">
+                <label>Certificações (separadas por vírgula)</label>
+                <input type="text" id="r-certs" value="${(resume.certifications || []).join(', ')}" placeholder="AWS Certified, Google Analytics...">
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function addExperience() {
+        resume.experience = resume.experience || [];
+        resume.experience.push({ company: '', role: '', period: '', description: '' });
+        renderForm();
+      }
+      function removeExperience(i) { resume.experience.splice(i, 1); renderForm(); }
+      function addEducation() {
+        resume.education = resume.education || [];
+        resume.education.push({ institution: '', course: '', period: '', level: '' });
+        renderForm();
+      }
+      function removeEducation(i) { resume.education.splice(i, 1); renderForm(); }
+      function addLanguage() {
+        resume.languages = resume.languages || [];
+        resume.languages.push({ name: '', level: 'Básico' });
+        renderForm();
+      }
+      function removeLanguage(i) { resume.languages.splice(i, 1); renderForm(); }
+
+      function collectFormData() {
+        resume.name = document.getElementById('r-name').value;
+        resume.email = document.getElementById('r-email').value;
+        resume.phone = document.getElementById('r-phone').value;
+        resume.title = document.getElementById('r-title').value;
+        resume.summary = document.getElementById('r-summary').value;
+
+        document.querySelectorAll('.exp-item').forEach((item, i) => {
+          resume.experience[i].company = item.querySelector('.exp-company').value;
+          resume.experience[i].role = item.querySelector('.exp-role').value;
+          resume.experience[i].period = item.querySelector('.exp-period').value;
+          resume.experience[i].description = item.querySelector('.exp-desc').value;
+        });
+
+        document.querySelectorAll('.edu-item').forEach((item, i) => {
+          resume.education[i].institution = item.querySelector('.edu-inst').value;
+          resume.education[i].course = item.querySelector('.edu-course').value;
+          resume.education[i].period = item.querySelector('.edu-period').value;
+          resume.education[i].level = item.querySelector('.edu-level').value;
+        });
+
+        resume.skills = document.getElementById('r-skills').value.split(',').map(s => s.trim()).filter(Boolean);
+
+        const langItems = document.querySelectorAll('#languages-list .form-row');
+        resume.languages = [];
+        langItems.forEach(item => {
+          const name = item.querySelector('.lang-name').value;
+          const level = item.querySelector('.lang-level').value;
+          if (name) resume.languages.push({ name, level });
+        });
+
+        resume.certifications = document.getElementById('r-certs').value.split(',').map(s => s.trim()).filter(Boolean);
+      }
+
+      function saveResume() {
+        collectFormData();
+        Resume.save(resume);
+        showToast('Currículo salvo com sucesso!', 'success');
+      }
+
+      function previewResume() {
+        collectFormData();
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay show';
+        modal.innerHTML = `
+          <div class="modal" style="max-width:700px;">
+            <div class="modal-header">
+              <h3>Preview do Currículo</h3>
+              <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div style="text-align:center; margin-bottom:1.5rem;">
+                <div style="width:80px;height:80px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;margin:0 auto 10px;">${getInitials(resume.name)}</div>
+                <h2>${resume.name || 'Seu nome'}</h2>
+                <p style="color:var(--primary); font-weight:600;">${resume.title || 'Seu título'}</p>
+                <p style="color:var(--text-light); font-size:0.85rem;">${resume.email || ''} ${resume.phone ? '· ' + resume.phone : ''}</p>
+              </div>
+              ${resume.summary ? `<div style="margin-bottom:1.5rem;"><h3 style="font-size:1rem; margin-bottom:0.5rem;">Resumo</h3><p style="font-size:0.9rem; color:var(--text-light);">${resume.summary}</p></div>` : ''}
+              ${(resume.experience || []).length > 0 ? `<div style="margin-bottom:1.5rem;"><h3 style="font-size:1rem; margin-bottom:0.5rem;">Experiência</h3>${resume.experience.map(e => `<div style="margin-bottom:0.75rem;"><strong>${e.role}</strong> · ${e.company}<br><span style="font-size:0.8rem; color:var(--text-muted);">${e.period}</span><br><span style="font-size:0.9rem;">${e.description}</span></div>`).join('')}</div>` : ''}
+              ${(resume.education || []).length > 0 ? `<div style="margin-bottom:1.5rem;"><h3 style="font-size:1rem; margin-bottom:0.5rem;">Formação</h3>${resume.education.map(e => `<div style="margin-bottom:0.5rem;"><strong>${e.course}</strong> · ${e.institution}<br><span style="font-size:0.8rem; color:var(--text-muted);">${e.period} · ${e.level}</span></div>`).join('')}</div>` : ''}
+              ${(resume.skills || []).length > 0 ? `<div style="margin-bottom:1.5rem;"><h3 style="font-size:1rem; margin-bottom:0.5rem;">Habilidades</h3><div style="display:flex; flex-wrap:wrap; gap:6px;">${resume.skills.map(s => `<span class="tag tag-blue">${s}</span>`).join('')}</div></div>` : ''}
+              ${(resume.languages || []).length > 0 ? `<div style="margin-bottom:1.5rem;"><h3 style="font-size:1rem; margin-bottom:0.5rem;">Idiomas</h3>${resume.languages.map(l => `<span class="tag tag-green">${l.name} - ${l.level}</span>`).join(' ')}</div>` : ''}
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+      }
+
+      renderForm();
+  </script>
+</body>
+</html>
+

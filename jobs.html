@@ -1,0 +1,188 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vagas - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <section class="container">
+    <div class="page-header">
+      <h1>Todas as vagas</h1>
+      <span id="jobs-count" style="color:var(--text-light);"></span>
+    </div>
+
+    <div class="search-filters">
+      <input type="text" id="filter-search" placeholder="Buscar vagas...">
+      <select id="filter-location">
+        <option value="">Todas as cidades</option>
+        <option value="São Paulo">São Paulo</option>
+        <option value="Rio de Janeiro">Rio de Janeiro</option>
+        <option value="Belo Horizonte">Belo Horizonte</option>
+        <option value="Curitiba">Curitiba</option>
+        <option value="Recife">Recife</option>
+        <option value="Remoto">Remoto</option>
+      </select>
+      <select id="filter-category">
+        <option value="">Todas as categorias</option>
+        <option value="Tecnologia">Tecnologia</option>
+        <option value="Marketing">Marketing</option>
+        <option value="Design">Design</option>
+        <option value="Gestão">Gestão</option>
+        <option value="Financeiro">Financeiro</option>
+      </select>
+      <select id="filter-experience">
+        <option value="">Qualquer experiência</option>
+        <option value="Estágio">Estágio</option>
+        <option value="Júnior">Júnior</option>
+        <option value="Pleno">Pleno</option>
+        <option value="Senior">Senior</option>
+      </select>
+      <select id="filter-regime">
+        <option value="">Qualquer regime</option>
+        <option value="Remoto">Remoto</option>
+        <option value="Híbrido">Híbrido</option>
+        <option value="Presencial">Presencial</option>
+      </select>
+      <select id="filter-type">
+        <option value="">Qualquer tipo</option>
+        <option value="CLT">CLT</option>
+        <option value="PJ">PJ</option>
+        <option value="Estágio">Estágio</option>
+        <option value="Freelancer">Freelancer</option>
+      </select>
+      <button class="btn btn-primary" onclick="applyFilters()">Filtrar</button>
+      <button class="btn btn-outline btn-sm" onclick="clearFilters()">Limpar</button>
+    </div>
+
+    <div class="job-list" id="jobs-list"></div>
+    <div class="pagination" id="pagination"></div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const params = new URLSearchParams(window.location.search);
+    const perPage = 8;
+    let currentPage = 1;
+
+    if (params.get('q')) document.getElementById('filter-search').value = params.get('q');
+    if (params.get('location')) document.getElementById('filter-location').value = params.get('location');
+    if (params.get('category')) document.getElementById('filter-category').value = params.get('category');
+
+    function getFilters() {
+      return {
+        search: document.getElementById('filter-search').value,
+        location: document.getElementById('filter-location').value,
+        category: document.getElementById('filter-category').value,
+        experience: document.getElementById('filter-experience').value,
+        regime: document.getElementById('filter-regime').value,
+        type: document.getElementById('filter-type').value,
+      };
+    }
+
+    function applyFilters() {
+      currentPage = 1;
+      renderJobs();
+    }
+
+    function clearFilters() {
+      document.getElementById('filter-search').value = '';
+      document.getElementById('filter-location').value = '';
+      document.getElementById('filter-category').value = '';
+      document.getElementById('filter-experience').value = '';
+      document.getElementById('filter-regime').value = '';
+      document.getElementById('filter-type').value = '';
+      currentPage = 1;
+      renderJobs();
+    }
+
+    let _jobsHash = '';
+    function renderJobs() {
+      const filters = getFilters();
+      const jobs = Jobs.getAll(filters);
+      const total = jobs.length;
+      const start = (currentPage - 1) * perPage;
+      const pageJobs = jobs.slice(start, start + perPage);
+
+      document.getElementById('jobs-count').textContent = `${total} vaga${total !== 1 ? 's' : ''} encontrada${total !== 1 ? 's' : ''}`;
+
+      const newHash = jobs.map(j => j.id + j.status).join(',');
+      if (newHash === _jobsHash) { renderNavbar(); return; }
+      _jobsHash = newHash;
+
+      const listEl = document.getElementById('jobs-list');
+      if (pageJobs.length === 0) {
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <h3>Nenhuma vaga encontrada</h3>
+            <p>Tente ajustar seus filtros de busca</p>
+          </div>
+        `;
+      } else {
+        listEl.innerHTML = pageJobs.map(j => {
+          const initials = getInitials(j.company);
+          return `
+            <div class="card job-card">
+              <div class="job-logo">${initials}</div>
+              <div class="job-info">
+                <div class="job-title" onclick="location.href='job-detail.html?id=${j.id}'">${j.title}</div>
+                <div class="job-company">${j.company}</div>
+                <div class="job-meta">
+                  <span>${getRegimeIcon(j.regime)} ${j.regime}</span>
+                  <span>📍 ${j.location}</span>
+                  <span>💰 ${j.salary}</span>
+                  <span>📋 ${j.type}</span>
+                  <span>📊 ${j.experience}</span>
+                </div>
+                <div class="job-tags">
+                  ${j.requirements ? j.requirements.slice(0, 5).map(r => `<span class="tag tag-blue">${r}</span>`).join('') : ''}
+                </div>
+              </div>
+              <div style="text-align:right; flex-shrink:0;">
+                ${j.urgent ? '<span class="badge badge-urgent">Urgente</span>' : ''}
+                ${j.featured ? '<span class="badge badge-featured" style="margin-top:4px;">Destaque</span>' : ''}
+                <div style="margin-top:8px; font-size:0.75rem; color:var(--text-muted);">${timeAgo(j.createdAt)}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const totalPages = Math.ceil(total / perPage);
+      const pagEl = document.getElementById('pagination');
+      if (totalPages <= 1) { pagEl.innerHTML = ''; return; }
+      let pagHTML = '';
+      if (currentPage > 1) pagHTML += `<button onclick="goPage(${currentPage - 1})">‹</button>`;
+      for (let i = 1; i <= totalPages; i++) {
+        pagHTML += `<button class="${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+      }
+      if (currentPage < totalPages) pagHTML += `<button onclick="goPage(${currentPage + 1})">›</button>`;
+      pagEl.innerHTML = pagHTML;
+      renderNavbar();
+    }
+
+    function goPage(p) { currentPage = p; renderJobs(); window.scrollTo(0, 0); }
+
+    ['filter-search', 'filter-location', 'filter-category', 'filter-experience', 'filter-regime', 'filter-type'].forEach(id => {
+      document.getElementById(id).addEventListener('change', applyFilters);
+    });
+    document.getElementById('filter-search').addEventListener('keypress', e => { if (e.key === 'Enter') applyFilters(); });
+
+    renderJobs();
+
+    Sync.on('jobs', () => { _jobsHash = ''; renderJobs(); });
+    Sync.on('applications', () => renderNavbar());
+    Live.register('jobs', { refresh: () => { _jobsHash = ''; renderJobs(); } });
+    Live.start(3000);
+  </script>
+</body>
+</html>
+

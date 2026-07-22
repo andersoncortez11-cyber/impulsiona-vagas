@@ -1,0 +1,800 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Administrativo - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .admin-header { background: linear-gradient(135deg, var(--primary-dark), var(--primary)); color: #fff; padding: 2rem 0; }
+    .admin-header h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+    .admin-header p { opacity: 0.85; font-size: 0.95rem; }
+    .admin-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 2rem; background: var(--card); border-radius: var(--radius) var(--radius) 0 0; overflow-x: auto; }
+    .admin-tab { padding: 1rem 1.5rem; cursor: pointer; font-weight: 600; font-size: 0.9rem; color: var(--text-muted); border-bottom: 3px solid transparent; transition: var(--transition); white-space: nowrap; }
+    .admin-tab:hover { color: var(--primary); background: var(--primary-light); }
+    .admin-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: rgba(73,80,188,0.05); }
+    .admin-tab .tab-count { background: var(--primary); color: #fff; font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; margin-left: 6px; }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; }
+    .admin-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .admin-stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+    .admin-stat .label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+    .admin-stat .value { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+    .admin-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; }
+    .admin-card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .admin-card-header h3 { font-size: 1rem; }
+    .admin-card-body { padding: 1.25rem; }
+    .user-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--bg); }
+    .user-row:last-child { border-bottom: none; }
+    .user-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+    .user-info { flex: 1; min-width: 0; }
+    .user-info .name { font-weight: 600; font-size: 0.95rem; }
+    .user-info .email { font-size: 0.8rem; color: var(--text-muted); }
+    .user-info .password { font-size: 0.8rem; color: var(--accent); font-family: monospace; }
+    .user-meta { text-align: right; flex-shrink: 0; }
+    .user-meta .date { font-size: 0.75rem; color: var(--text-muted); }
+    .search-box { width: 100%; padding: 0.6rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; margin-bottom: 1rem; background: var(--bg); }
+    .search-box:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(73,80,188,0.1); }
+    .job-row { padding: 0.75rem 0; border-bottom: 1px solid var(--bg); }
+    .job-row:last-child { border-bottom: none; }
+    .job-row .title { font-weight: 600; }
+    .job-row .meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+    .empty-admin { text-align: center; padding: 3rem; color: var(--text-muted); }
+    .empty-admin .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .folder { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden; background: var(--card); }
+    .folder-header { display: flex; align-items: center; gap: 12px; padding: 1rem 1.25rem; cursor: pointer; transition: var(--transition); user-select: none; border-bottom: 1px solid transparent; }
+    .folder-header:hover { background: var(--primary-lighter); }
+    .folder.open .folder-header { border-bottom-color: var(--border); }
+    .folder-arrow { font-size: 0.75rem; transition: transform 0.2s ease; color: var(--text-muted); }
+    .folder.open .folder-arrow { transform: rotate(90deg); }
+    .folder-icon { font-size: 1.1rem; }
+    .folder-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
+    .folder-count { background: var(--primary); color: #fff; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .folder-body { display: none; padding: 0.5rem 0; }
+    .folder.open .folder-body { display: block; }
+  </style>
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <div class="admin-header">
+    <div class="container">
+      <h1>Painel Administrativo</h1>
+      <p>Visualize todos os dados do sistema</p>
+    </div>
+  </div>
+
+  <section class="container" style="margin-top:2rem;">
+    <div class="admin-tabs" id="admin-tabs">
+      <div class="admin-tab active" data-tab="users">👤 Usuários <span class="tab-count" id="count-users">0</span></div>
+      <div class="admin-tab" data-tab="jobs">💼 Vagas <span class="tab-count" id="count-jobs">0</span></div>
+      <div class="admin-tab" data-tab="applications">📋 Candidaturas <span class="tab-count" id="count-apps">0</span></div>
+      <div class="admin-tab" data-tab="resumes">📄 Currículos <span class="tab-count" id="count-resumes">0</span></div>
+      <div class="admin-tab" data-tab="messages">💬 Mensagens <span class="tab-count" id="count-msgs">0</span></div>
+      <div class="admin-tab" data-tab="settings">⚙ Configurações</div>
+    </div>
+
+    <!-- USUÁRIOS -->
+    <div class="admin-panel active" id="panel-users">
+      <div class="admin-stat-grid">
+        <div class="admin-stat"><div class="label">Total de usuários</div><div class="value" id="stat-total-users">0</div></div>
+        <div class="admin-stat"><div class="label">Empresas</div><div class="value" id="stat-companies">0</div></div>
+        <div class="admin-stat"><div class="label">Candidatos</div><div class="value" id="stat-candidates">0</div></div>
+      </div>
+      <input type="text" class="search-box" id="search-users" placeholder="Buscar por nome ou email...">
+      <div class="folder open" id="folder-companies">
+        <div class="folder-header" onclick="toggleFolder('folder-companies')">
+          <span class="folder-arrow">▶</span>
+          <span class="folder-icon">🏢</span>
+          <span class="folder-title">Empresas</span>
+          <span class="folder-count" id="folder-count-companies">0</span>
+        </div>
+        <div class="folder-body" id="folder-body-companies"></div>
+      </div>
+      <div class="folder open" id="folder-candidates">
+        <div class="folder-header" onclick="toggleFolder('folder-candidates')">
+          <span class="folder-arrow">▶</span>
+          <span class="folder-icon">👤</span>
+          <span class="folder-title">Candidatos</span>
+          <span class="folder-count" id="folder-count-candidates">0</span>
+        </div>
+        <div class="folder-body" id="folder-body-candidates"></div>
+      </div>
+    </div>
+
+    <!-- VAGAS -->
+    <div class="admin-panel" id="panel-jobs">
+      <div class="admin-stat-grid">
+        <div class="admin-stat"><div class="label">Total de vagas</div><div class="value" id="stat-total-jobs">0</div></div>
+        <div class="admin-stat"><div class="label">Ativas</div><div class="value" id="stat-active-jobs">0</div></div>
+        <div class="admin-stat"><div class="label">Pausadas</div><div class="value" id="stat-paused-jobs">0</div></div>
+      </div>
+      <input type="text" class="search-box" id="search-jobs" placeholder="Buscar vaga por título ou empresa...">
+      <div id="jobs-folders"></div>
+    </div>
+
+    <!-- CANDIDATURAS -->
+    <div class="admin-panel" id="panel-applications">
+      <div class="admin-stat-grid">
+        <div class="admin-stat"><div class="label">Total de candidaturas</div><div class="value" id="stat-total-apps">0</div></div>
+        <div class="admin-stat"><div class="label">Pendentes</div><div class="value" id="stat-pending-apps">0</div></div>
+        <div class="admin-stat"><div class="label">Aceitas</div><div class="value" id="stat-accepted-apps">0</div></div>
+        <div class="admin-stat"><div class="label">Rejeitadas</div><div class="value" id="stat-rejected-apps">0</div></div>
+      </div>
+      <div id="apps-folders"></div>
+    </div>
+
+    <!-- CURRÍCULOS -->
+    <div class="admin-panel" id="panel-resumes">
+      <div class="admin-stat-grid">
+        <div class="admin-stat"><div class="label">Total de currículos</div><div class="value" id="stat-total-resumes">0</div></div>
+      </div>
+      <div id="resumes-list"></div>
+    </div>
+
+    <!-- MENSAGENS -->
+    <div class="admin-panel" id="panel-messages">
+      <div class="admin-stat-grid">
+        <div class="admin-stat"><div class="label">Total de mensagens</div><div class="value" id="stat-total-msgs">0</div></div>
+        <div class="admin-stat"><div class="label">Conversas</div><div class="value" id="stat-total-convos">0</div></div>
+      </div>
+      <div id="msgs-folders"></div>
+    </div>
+    <!-- CONFIGURAÇÕES -->
+    <div class="admin-panel" id="panel-settings">
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h3>💳 Configuração do Mercado Pago</h3>
+        </div>
+        <div class="admin-card-body">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem;">
+            Configure suas credenciais e crie o plano de assinatura automaticamente.<br>
+            <strong>Modo teste:</strong> use credenciais de teste para simular pagamentos sem cobrar.<br>
+            <strong>Modo produção:</strong> use credenciais de produção para cobrar de verdade.
+          </p>
+
+          <div class="form-group">
+            <label style="font-weight:600; font-size:0.9rem;">Modo</label>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+              <label style="display:flex; align-items:center; gap:4px; cursor:pointer; padding:8px 16px; border:2px solid var(--border); border-radius:8px; font-size:0.85rem;" id="mode-test-label">
+                <input type="radio" name="mp-mode" value="test" id="mp-mode-test" onchange="toggleMpMode()"> 🧪 Teste
+              </label>
+              <label style="display:flex; align-items:center; gap:4px; cursor:pointer; padding:8px 16px; border:2px solid var(--border); border-radius:8px; font-size:0.85rem;" id="mode-prod-label">
+                <input type="radio" name="mp-mode" value="production" id="mp-mode-prod" checked onchange="toggleMpMode()"> 🚀 Produção
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:1rem;">
+            <label style="font-weight:600; font-size:0.9rem;">Access Token</label>
+            <input type="password" id="mp-access-token" class="search-box" placeholder="APP_USR-xxxx-xxxx-xxxx" style="margin-top:4px;">
+            <p class="form-hint" style="margin-top:6px;" id="mp-token-hint">
+              Pegue em <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" style="color:var(--primary);">Suas Integrações</a> → Produção → Credenciais
+            </p>
+          </div>
+
+          <div class="form-group" style="margin-top:1rem;">
+            <label style="font-weight:600; font-size:0.9rem;">URL de retorno (back_url)</label>
+            <input type="url" id="mp-back-url" class="search-box" placeholder="https://seudominio.com/company-dashboard.html" style="margin-top:4px;">
+            <p class="form-hint" style="margin-top:6px;">
+              URL para onde o usuário volta após pagar. Use HTTPS. Ex: <code>https://seudominio.com/company-dashboard.html</code>
+            </p>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:1rem; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="createMpPlan()" id="btn-create-plan">Criar plano automaticamente</button>
+            <button class="btn btn-outline" onclick="testMpConnection()">Testar credenciais</button>
+          </div>
+          <div id="mp-config-status" style="margin-top:1rem;"></div>
+
+          <div class="form-group" style="margin-top:1.5rem;">
+            <label style="font-weight:600; font-size:0.9rem;">Link de checkout (gerado pelo sistema)</label>
+            <input type="url" id="mp-checkout-url" class="search-box" readonly placeholder="Será preenchido após criar o plano" style="margin-top:4px; background:var(--bg);">
+          </div>
+
+          <button class="btn btn-primary" onclick="saveMpConfig()" style="margin-top:0.5rem;">Salvar configuração</button>
+        </div>
+      </div>
+
+      <div class="admin-card" style="margin-top:1rem;">
+        <div class="admin-card-header">
+          <h3>🔔 Webhook (Notificações do Mercado Pago)</h3>
+        </div>
+        <div class="admin-card-body">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+            Configure este URL como webhook no painel do Mercado Pago para receber notificações de pagamento.
+          </p>
+          <div class="form-group">
+            <label style="font-weight:600; font-size:0.9rem;">URL do Webhook</label>
+            <div style="display:flex; gap:8px; margin-top:4px;">
+              <input type="text" id="mp-webhook-url" class="search-box" readonly style="background:var(--bg);" value="">
+              <button class="btn btn-outline" onclick="copyWebhookUrl()" style="white-space:nowrap;">Copiar</button>
+            </div>
+            <p class="form-hint" style="margin-top:6px;">
+              Cole esta URL em: Mercado Pago → Suas Integrações → Webhooks → Produção → URL de notificação
+            </p>
+          </div>
+          <div id="webhook-status" style="margin-top:1rem;"></div>
+          <button class="btn btn-outline" onclick="testWebhook()" style="margin-top:0.5rem;">Testar webhook</button>
+        </div>
+      </div>
+
+      <div class="admin-card" style="margin-top:1rem;">
+        <div class="admin-card-header">
+          <h3>📊 Assinaturas ativas</h3>
+        </div>
+        <div class="admin-card-body">
+          <div id="subscriptions-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+
+    const MP_CONFIG_KEY = 'impulsiona_mp_config';
+
+    function toggleMpMode() {
+      const isTest = document.getElementById('mp-mode-test').checked;
+      const hint = document.getElementById('mp-token-hint');
+      const label = document.getElementById('mp-access-token');
+      const testLabel = document.getElementById('mode-test-label');
+      const prodLabel = document.getElementById('mode-prod-label');
+      if (isTest) {
+        hint.innerHTML = 'Use credenciais de <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" style="color:var(--primary);">Credenciais de teste</a> (TEST-xxxx)';
+        label.placeholder = 'TEST-xxxx-xxxx-xxxx';
+        testLabel.style.borderColor = 'var(--primary)';
+        prodLabel.style.borderColor = 'var(--border)';
+      } else {
+        hint.innerHTML = 'Pegue em <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" style="color:var(--primary);">Suas Integrações</a> → Produção → Credenciais';
+        label.placeholder = 'APP_USR-xxxx-xxxx-xxxx';
+        prodLabel.style.borderColor = 'var(--primary)';
+        testLabel.style.borderColor = 'var(--border)';
+      }
+      // Save mode preference
+      const old = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+      old.mode = isTest ? 'test' : 'production';
+      localStorage.setItem(MP_CONFIG_KEY, JSON.stringify(old));
+    }
+
+    function copyWebhookUrl() {
+      const url = document.getElementById('mp-webhook-url').value;
+      navigator.clipboard.writeText(url).then(() => { showToast('URL copiada!', 'success'); });
+    }
+
+    async function testWebhook() {
+      const statusEl = document.getElementById('webhook-status');
+      statusEl.innerHTML = '<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:0.75rem; color:#856404; font-size:0.85rem;">⏳ Enviando notificação de teste...</div>';
+      try {
+        const config = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+        const r = await fetch('/api/webhook/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'payment', mode: config.mode || 'test' })
+        });
+        const data = await r.json();
+        if (data.success) {
+          statusEl.innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Webhook funcionando! Verifique o console do servidor.</div>';
+        } else {
+          statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ ' + (data.error || 'Erro ao testar webhook') + '</div>';
+        }
+      } catch(e) {
+        statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Erro: ' + e.message + '<br>Certifique-se que o servidor está rodando (node server.js)</div>';
+      }
+    }
+
+    function renderSubscriptions() {
+      const users = DB.get('users') || [];
+      const companies = users.filter(u => u.type === 'company');
+      const el = document.getElementById('subscriptions-list');
+      if (!companies.length) { el.innerHTML = '<p style="color:var(--text-muted); font-size:0.9rem;">Nenhuma empresa cadastrada.</p>'; return; }
+      el.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%; font-size:0.85rem;"><thead><tr><th>Empresa</th><th>Email</th><th>Status</th><th>Expira em</th><th>Ações</th></tr></thead><tbody>' +
+        companies.map(c => {
+          const sub = c.subscription || {};
+          const isActive = sub.status === 'authorized' || sub.status === 'active';
+          const isExpired = sub.expiresAt && new Date(sub.expiresAt) < new Date();
+          const statusColor = isActive && !isExpired ? '#28a745' : isExpired ? '#dc3545' : '#6c757d';
+          const statusText = isActive && !isExpired ? 'Ativa' : isExpired ? 'Expirada' : 'Sem assinatura';
+          return `<tr><td><strong>${c.company || c.name}</strong></td><td>${c.email}</td>
+            <td><span style="color:${statusColor}; font-weight:600;">${statusText}</span></td>
+            <td>${sub.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('pt-BR') : '-'}</td>
+            <td>${sub.preapprovalId ? '<button class="btn btn-sm btn-outline" onclick="cancelSubscription(\'' + c.id + '\')">Cancelar</button>' : '-'}</td></tr>`;
+        }).join('') + '</tbody></table></div>';
+    }
+
+    async function cancelSubscription(userId) {
+      if (!confirm('Cancelar esta assinatura? A empresa perderá o acesso.')) return;
+      const config = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+      const users = DB.get('users') || [];
+      const user = users.find(u => u.id === userId);
+      if (!user || !user.subscription) return;
+
+      try {
+        const r = await fetch('/api/mp/preapproval/' + user.subscription.preapprovalId, {
+          method: 'DELETE',
+          headers: { 'X-MP-Access-Token': config.accessToken }
+        });
+        if (r.ok || r.status === 204) {
+          user.subscription.status = 'cancelled';
+          DB.setUsers(users);
+          showToast('Assinatura cancelada!', 'success');
+          renderSubscriptions();
+        } else {
+          showToast('Erro ao cancelar assinatura', 'error');
+        }
+      } catch(e) {
+        showToast('Erro: ' + e.message, 'error');
+      }
+    }
+
+    function loadMpConfig() {
+      const config = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+      if (config.checkoutUrl) document.getElementById('mp-checkout-url').value = config.checkoutUrl;
+      if (config.accessToken) document.getElementById('mp-access-token').value = config.accessToken;
+      if (config.backUrl) document.getElementById('mp-back-url').value = config.backUrl;
+      if (config.mode === 'test') {
+        document.getElementById('mp-mode-test').checked = true;
+        toggleMpMode();
+      }
+      // Set webhook URL
+      document.getElementById('mp-webhook-url').value = window.location.origin + '/api/webhook/mercadopago';
+      // Render subscriptions
+      renderSubscriptions();
+    }
+
+    function saveMpConfig() {
+      const accessToken = document.getElementById('mp-access-token').value.trim();
+      const checkoutUrl = document.getElementById('mp-checkout-url').value.trim();
+      const backUrl = document.getElementById('mp-back-url').value.trim();
+      const mode = document.getElementById('mp-mode-test').checked ? 'test' : 'production';
+      if (!checkoutUrl) {
+        showToast('Crie o plano primeiro ou insira um link', 'error');
+        return;
+      }
+      const old = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+      localStorage.setItem(MP_CONFIG_KEY, JSON.stringify({ ...old, accessToken, checkoutUrl, backUrl, mode }));
+      document.getElementById('mp-config-status').innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Configuração salva! Modo: ' + (mode === 'test' ? 'TESTE' : 'PRODUÇÃO') + '</div>';
+      showToast('Configuração salva!', 'success');
+    }
+
+    async function testMpConnection() {
+      const accessToken = document.getElementById('mp-access-token').value.trim();
+      if (!accessToken) { showToast('Insira o Access Token', 'error'); return; }
+      const statusEl = document.getElementById('mp-config-status');
+      statusEl.innerHTML = '<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:0.75rem; color:#856404; font-size:0.85rem;">⏳ Testando credenciais via servidor local...</div>';
+      try {
+        console.log('[MP] Testando credenciais via proxy...');
+        console.log('[MP] Token (primeiros 10 chars):', accessToken.substring(0, 10) + '...');
+        const r = await fetch('/api/mp/v1/payment_methods', {
+          headers: { 'X-MP-Access-Token': accessToken }
+        });
+        console.log('[MP] Status:', r.status);
+        const data = await r.json();
+        console.log('[MP] Response completa:', JSON.stringify(data, null, 2));
+        if (r.ok && (data.results || Array.isArray(data))) {
+          const count = data.results ? data.results.length : data.length;
+          statusEl.innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Credenciais válidas! (' + count + ' métodos disponíveis)</div>';
+        } else {
+          statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Token inválido<br><br><strong>Resposta do MP:</strong><br><pre style="white-space:pre-wrap; margin:0.5rem 0; padding:0.5rem; background:#fff; border-radius:4px; font-size:0.8rem; overflow-x:auto;">' + JSON.stringify(data, null, 2) + '</pre></div>';
+        }
+      } catch(e) {
+        console.error('[MP] Erro:', e);
+        statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Erro: ' + e.message + '<br>Certifique-se que o servidor está rodando (node server.js)</div>';
+      }
+    }
+
+    async function createMpPlan() {
+      const accessToken = document.getElementById('mp-access-token').value.trim();
+      if (!accessToken) { showToast('Insira o Access Token', 'error'); return; }
+
+      const isTest = document.getElementById('mp-mode-test').checked;
+      const modeLabel = isTest ? 'TESTE' : 'PRODUÇÃO';
+      const btn = document.getElementById('btn-create-plan');
+      const statusEl = document.getElementById('mp-config-status');
+      btn.disabled = true;
+      btn.textContent = 'Criando plano...';
+      statusEl.innerHTML = '<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:0.75rem; color:#856404; font-size:0.85rem;">⏳ Criando plano de R$ 49,99/mês (' + modeLabel + ')...</div>';
+
+      try {
+        const planBody = JSON.stringify({
+          reason: 'Plano Empresa - Impulsiona Vagas',
+          auto_recurring: {
+            frequency: 1,
+            frequency_type: 'months',
+            transaction_amount: 49.99,
+            currency_id: 'BRL'
+          },
+          payment_methods_allowed: {
+            payment_types: [
+              { id: 'credit_card' },
+              { id: 'debit_card' }
+            ]
+          },
+          back_url: document.getElementById('mp-back-url') ? document.getElementById('mp-back-url').value.trim() : (window.location.origin + '/company-dashboard.html')
+        });
+        console.log('[MP] Enviando plano:', planBody);
+        const r = await fetch('/api/mp/preapproval_plan', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-MP-Access-Token': accessToken
+          },
+          body: planBody
+        });
+
+        console.log('[MP] Plan response status:', r.status);
+        const data = await r.json();
+        console.log('[MP] Plan response:', data);
+
+        if (data.id) {
+          const checkoutUrl = 'https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=' + data.id;
+          document.getElementById('mp-checkout-url').value = checkoutUrl;
+
+          const old = JSON.parse(localStorage.getItem(MP_CONFIG_KEY) || '{}');
+          localStorage.setItem(MP_CONFIG_KEY, JSON.stringify({ ...old, accessToken, planId: data.id, checkoutUrl }));
+
+          statusEl.innerHTML = '<div style="background:#d4edda; border:1px solid #28a745; border-radius:8px; padding:0.75rem; color:#155724; font-size:0.85rem;">✅ Plano criado! ID: ' + data.id + '<br>Agora clique em "Salvar configuração".</div>';
+          showToast('Plano criado com sucesso!', 'success');
+        } else {
+          const errMsg = data.message || data.cause || JSON.stringify(data);
+          statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Erro: ' + errMsg + '</div>';
+        }
+      } catch(e) {
+        statusEl.innerHTML = '<div style="background:#f8d7da; border:1px solid #f5c6cb; border-radius:8px; padding:0.75rem; color:#721c24; font-size:0.85rem;">❌ Erro: ' + e.message + '<br>Certifique-se que o servidor está rodando (node server.js)</div>';
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Criar plano automaticamente';
+    }
+
+    function toggleFolder(id) {
+      document.getElementById(id).classList.toggle('open');
+    }
+
+    function getData() {
+      return {
+        users: DB.get('users') || [],
+        jobs: DB.get('jobs') || [],
+        applications: DB.get('applications') || [],
+        resumes: DB.get('resumes') || [],
+        messages: DB.get('messages') || []
+      };
+    }
+
+    let data = getData();
+
+    function getInitialsLocal(name) {
+      return (name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    }
+
+    function formatDateFull(d) {
+      if (!d) return '-';
+      return new Date(d).toLocaleDateString('pt-BR') + ' ' + new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function getUserName(id) {
+      const u = data.users.find(u => u.id === id);
+      return u ? u.name : 'Desconhecido';
+    }
+
+    function getJobTitle(id) {
+      const j = data.jobs.find(j => j.id === id);
+      return j ? j.title + ' (' + j.company + ')' : 'Vaga não encontrada';
+    }
+
+    function getStatusTextLocal(s) {
+      const map = { pending: 'Pendente', viewed: 'Verificado', accepted: 'Aceito', rejected: 'Rejeitado' };
+      return map[s] || s;
+    }
+
+    function userCard(u) {
+      return `
+        <div class="admin-card">
+          <div class="admin-card-body">
+            <div class="user-row">
+              <div class="user-avatar">${getInitialsLocal(u.name)}</div>
+              <div class="user-info">
+                <div class="name">${u.name} <span class="tag ${u.type === 'company' ? 'tag-green' : 'tag-blue'}" style="font-size:0.7rem;">${u.type === 'company' ? 'Empresa' : 'Candidato'}</span></div>
+                <div class="email">📧 ${u.email}</div>
+                <div class="password">🔑 ${u.password}</div>
+                ${u.company ? '<div class="email">🏢 ' + u.company + '</div>' : ''}
+                ${u.phone ? '<div class="email">📱 ' + u.phone + '</div>' : ''}
+              </div>
+              <div class="user-meta">
+                <div class="date">ID: ${u.id}</div>
+                <div class="date">${formatDateFull(u.createdAt)}</div>
+                ${u.subscription ? '<div class="date" style="color:var(--secondary);">assinatura ' + (u.subscription.status === 'active' ? 'ativa' : u.subscription.status === 'pending' ? 'pendente' : 'inativa') + '</div>' + (u.subscription.expiresAt ? '<div class="date" style="color:var(--text-muted);">expira: ' + new Date(u.subscription.expiresAt).toLocaleDateString('pt-BR') + '</div>' : '') : ''}
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderAll() {
+      data = getData();
+      const f = (document.getElementById('search-users').value || '').toLowerCase();
+      const filtered = data.users.filter(u => !f || u.name.toLowerCase().includes(f) || u.email.toLowerCase().includes(f));
+      const companies = filtered.filter(u => u.type === 'company');
+      const candidates = filtered.filter(u => u.type === 'candidate');
+
+      document.getElementById('count-users').textContent = data.users.length;
+      document.getElementById('count-jobs').textContent = data.jobs.length;
+      document.getElementById('count-apps').textContent = data.applications.length;
+      document.getElementById('count-resumes').textContent = data.resumes.length;
+      document.getElementById('count-msgs').textContent = data.messages.length;
+
+      document.getElementById('stat-total-users').textContent = data.users.length;
+      document.getElementById('stat-companies').textContent = data.users.filter(u => u.type === 'company').length;
+      document.getElementById('stat-candidates').textContent = data.users.filter(u => u.type === 'candidate').length;
+      document.getElementById('stat-total-apps').textContent = data.applications.length;
+      document.getElementById('stat-pending-apps').textContent = data.applications.filter(a => a.status === 'pending').length;
+      document.getElementById('stat-accepted-apps').textContent = data.applications.filter(a => a.status === 'accepted').length;
+      document.getElementById('stat-rejected-apps').textContent = data.applications.filter(a => a.status === 'rejected').length;
+      document.getElementById('stat-total-resumes').textContent = data.resumes.length;
+      document.getElementById('stat-total-msgs').textContent = data.messages.length;
+
+      const convos = {};
+      data.messages.forEach(m => {
+        const key = [m.from, m.to, m.jobId].sort().join('_');
+        convos[key] = true;
+      });
+      document.getElementById('stat-total-convos').textContent = Object.keys(convos).length;
+
+      document.getElementById('folder-count-companies').textContent = companies.length;
+      document.getElementById('folder-body-companies').innerHTML = companies.length
+        ? companies.map(userCard).join('')
+        : '<div class="empty-admin" style="padding:1.5rem;"><div class="icon">🏢</div><p>Nenhuma empresa encontrada</p></div>';
+
+      document.getElementById('folder-count-candidates').textContent = candidates.length;
+      document.getElementById('folder-body-candidates').innerHTML = candidates.length
+        ? candidates.map(userCard).join('')
+        : '<div class="empty-admin" style="padding:1.5rem;"><div class="icon">👤</div><p>Nenhum candidato encontrado</p></div>';
+
+      renderJobs();
+      renderApps();
+      renderResumes();
+      renderMessages();
+    }
+
+    // TABS
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    document.getElementById('search-users').addEventListener('input', () => renderAll());
+    document.getElementById('search-jobs').addEventListener('input', () => renderJobs());
+
+    // RENDER JOBS
+    function renderJobs() {
+      const f = (document.getElementById('search-jobs').value || '').toLowerCase();
+      const filtered = data.jobs.filter(j => !f || j.title.toLowerCase().includes(f) || j.company.toLowerCase().includes(f));
+      const el = document.getElementById('jobs-folders');
+
+      document.getElementById('stat-total-jobs').textContent = data.jobs.length;
+      document.getElementById('stat-active-jobs').textContent = data.jobs.filter(j => j.status === 'active').length;
+      document.getElementById('stat-paused-jobs').textContent = data.jobs.filter(j => j.status === 'paused').length;
+
+      if (filtered.length === 0) {
+        el.innerHTML = '<div class="empty-admin"><div class="icon">💼</div><p>Nenhuma vaga encontrada</p></div>';
+        return;
+      }
+
+      const grouped = {};
+      filtered.forEach(j => {
+        if (!grouped[j.companyId]) grouped[j.companyId] = [];
+        grouped[j.companyId].push(j);
+      });
+
+      el.innerHTML = Object.entries(grouped).map(([companyId, jobs]) => {
+        const companyName = jobs[0].company;
+        const active = jobs.filter(j => j.status === 'active').length;
+        const paused = jobs.filter(j => j.status === 'paused').length;
+        const fid = 'folder-jobs-' + companyId;
+        return `
+          <div class="folder open" id="${fid}">
+            <div class="folder-header" onclick="toggleFolder('${fid}')">
+              <span class="folder-arrow">▶</span>
+              <span class="folder-icon">🏢</span>
+              <span class="folder-title">${companyName}</span>
+              <span style="font-size:0.7rem; color:var(--text-muted); margin-right:4px;">✅${active} ⏸${paused}</span>
+              <span class="folder-count">${jobs.length}</span>
+            </div>
+            <div class="folder-body">
+              ${jobs.map(j => `
+                <div class="admin-card">
+                  <div class="admin-card-header">
+                    <h3>${j.title}</h3>
+                    <span class="tag ${j.status === 'active' ? 'tag-green' : 'tag-gray'}">${j.status === 'active' ? 'Ativa' : 'Pausada'}</span>
+                  </div>
+                  <div class="admin-card-body">
+                    <div class="job-row">
+                      <div class="meta">📍 ${j.location} · 💰 ${j.salary}</div>
+                      <div class="meta">📋 ${j.type} · ${j.regime} · ${j.experience}</div>
+                      <div class="meta">📅 Criada em ${formatDateFull(j.createdAt)}</div>
+                      ${j.urgent ? '<div class="meta" style="color:var(--danger);">⚡ Urgente</div>' : ''}
+                      ${j.featured ? '<div class="meta" style="color:var(--accent);">⭐ Destaque</div>' : ''}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // RENDER APPLICATIONS
+    function renderApps() {
+      const el = document.getElementById('apps-folders');
+      if (data.applications.length === 0) {
+        el.innerHTML = '<div class="empty-admin"><div class="icon">📋</div><p>Nenhuma candidatura ainda</p></div>';
+        return;
+      }
+
+      const grouped = {};
+      data.applications.forEach(a => {
+        const job = data.jobs.find(j => j.id === a.jobId);
+        const companyId = job ? job.companyId : 'unknown';
+        if (!grouped[companyId]) grouped[companyId] = [];
+        grouped[companyId].push(a);
+      });
+
+      el.innerHTML = Object.entries(grouped).map(([companyId, apps]) => {
+        const job = data.jobs.find(j => apps.some(a => a.jobId === j.id));
+        const companyName = job ? job.company : 'Empresa desconhecida';
+        const pending = apps.filter(a => a.status === 'pending').length;
+        const accepted = apps.filter(a => a.status === 'accepted').length;
+        const rejected = apps.filter(a => a.status === 'rejected').length;
+        const fid = 'folder-apps-' + companyId;
+        const sorted = [...apps].sort((a, b) => new Date(b.updatedAt || b.appliedAt) - new Date(a.updatedAt || a.appliedAt));
+        return `
+          <div class="folder open" id="${fid}">
+            <div class="folder-header" onclick="toggleFolder('${fid}')">
+              <span class="folder-arrow">▶</span>
+              <span class="folder-icon">🏢</span>
+              <span class="folder-title">${companyName}</span>
+              <span style="font-size:0.7rem; color:var(--text-muted); margin-right:4px;">⏳${pending} ✅${accepted} ❌${rejected}</span>
+              <span class="folder-count">${apps.length}</span>
+            </div>
+            <div class="folder-body">
+              ${sorted.map(a => {
+                const candidate = data.users.find(u => u.id === a.userId);
+                const job = data.jobs.find(j => j.id === a.jobId);
+                return `
+                <div class="admin-card">
+                  <div class="admin-card-header">
+                    <h3>${candidate ? candidate.name : 'Desconhecido'} → ${job ? job.title : 'Vaga excluída'}</h3>
+                    <span class="tag tag-${a.status === 'accepted' ? 'green' : a.status === 'rejected' ? 'red' : a.status === 'viewed' ? 'blue' : 'orange'}">${getStatusTextLocal(a.status)}</span>
+                  </div>
+                  <div class="admin-card-body">
+                    <div class="job-row">
+                      <div class="meta">📧 ${candidate ? candidate.email : '-'} · 📅 ${formatDateFull(a.appliedAt)}</div>
+                      ${a.resumePdf ? '<div class="meta" style="color:var(--secondary);">📄 PDF: ' + (a.resumePdfName || 'curriculo.pdf') + '</div>' : ''}
+                      ${a.coverLetter ? '<div class="meta" style="font-style:italic; color:var(--text-muted);">"' + a.coverLetter.substring(0, 120) + (a.coverLetter.length > 120 ? '...' : '') + '"</div>' : ''}
+                    </div>
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // RENDER RESUMES
+    function renderResumes() {
+      const el = document.getElementById('resumes-list');
+      if (data.resumes.length === 0) {
+        el.innerHTML = '<div class="empty-admin"><div class="icon">📄</div><p>Nenhum currículo ainda</p></div>';
+        return;
+      }
+      el.innerHTML = data.resumes.map(r => {
+        const completion = Resume.getCompletion(r);
+        return `
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <h3>${r.name || 'Sem nome'}</h3>
+              <span class="tag tag-blue">${completion}% completo</span>
+            </div>
+            <div class="admin-card-body">
+              <div class="job-row">
+                <div class="meta">📧 ${r.email || '-'} · 📱 ${r.phone || '-'}</div>
+                <div class="meta">💼 ${r.title || 'Sem título'}</div>
+                <div class="meta">📚 ${(r.education || []).length} formações · 💼 ${(r.experience || []).length} experiências · 🛠 ${(r.skills || []).length} habilidades</div>
+                <div class="meta">ID: ${r.id} · Usuário ID: ${r.userId}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // RENDER MESSAGES
+    function renderMessages() {
+      const el = document.getElementById('msgs-folders');
+      if (data.messages.length === 0) {
+        el.innerHTML = '<div class="empty-admin"><div class="icon">💬</div><p>Nenhuma mensagem ainda</p></div>';
+        return;
+      }
+
+      const convos = {};
+      data.messages.forEach(m => {
+        const key = [m.from, m.to, m.jobId].sort().join('_');
+        if (!convos[key]) convos[key] = [];
+        convos[key].push(m);
+      });
+
+      const sorted = Object.entries(convos).sort((a, b) => {
+        const lastA = a[1].reduce((max, m) => new Date(m.timestamp) > new Date(max) ? m.timestamp : max, a[1][0].timestamp);
+        const lastB = b[1].reduce((max, m) => new Date(m.timestamp) > new Date(max) ? m.timestamp : max, b[1][0].timestamp);
+        return new Date(lastB) - new Date(lastA);
+      });
+
+      el.innerHTML = sorted.map(([key, msgs], idx) => {
+        const sortedMsgs = [...msgs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        const first = sortedMsgs[0];
+        const last = sortedMsgs[sortedMsgs.length - 1];
+        const userA = data.users.find(u => u.id === first.from);
+        const userB = data.users.find(u => u.id === first.to);
+        const job = data.jobs.find(j => j.id === first.jobId);
+        const nameA = userA ? userA.name : 'Desconhecido';
+        const nameB = userB ? userB.name : 'Desconhecido';
+        const typeA = userA ? (userA.type === 'company' ? '🏢' : '👤') : '';
+        const typeB = userB ? (userB.type === 'company' ? '🏢' : '👤') : '';
+        const fid = 'folder-conv-' + idx;
+        const lastSender = data.users.find(u => u.id === last.from);
+        const lastPreview = last.text.length > 60 ? last.text.substring(0, 60) + '...' : last.text;
+        const lastTime = formatDateFull(last.timestamp);
+
+        return `
+          <div class="folder" id="${fid}">
+            <div class="folder-header" onclick="toggleFolder('${fid}')" style="flex-wrap:wrap;">
+              <span class="folder-arrow">▶</span>
+              <span class="folder-icon">💬</span>
+              <span class="folder-title">${typeA} ${nameA} ↔ ${typeB} ${nameB}</span>
+              <span style="font-size:0.7rem; color:var(--accent); margin-right:4px;">📋 ${job ? job.title : 'Vaga excluída'}</span>
+              <span class="folder-count">${msgs.length}</span>
+              <div style="width:100%; font-size:0.78rem; color:var(--text-muted); margin-left:42px; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${lastSender ? lastSender.name.split(' ')[0] : '?'}: ${lastPreview} · ${lastTime}
+              </div>
+            </div>
+            <div class="folder-body" style="padding:0.75rem 1rem; background:var(--bg); display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:0.75rem; color:var(--text-muted); padding-bottom:6px; border-bottom:1px solid var(--border); margin-bottom:4px;">
+                🏢 ${job ? job.company : 'Empresa'} · 📍 ${job ? job.location : '-'} · 💰 ${job ? job.salary : '-'} · Início: ${formatDateFull(first.timestamp)}
+              </div>
+              ${sortedMsgs.map(m => {
+                const sender = data.users.find(u => u.id === m.from);
+                const isCompany = sender && sender.type === 'company';
+                const time = new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const date = new Date(m.timestamp).toLocaleDateString('pt-BR');
+                return `
+                  <div style="display:flex; gap:8px; align-items:flex-start; ${isCompany ? '' : 'flex-direction:row-reverse;'}">
+                    <div style="font-size:0.7rem; padding:2px 8px; border-radius:10px; white-space:nowrap; ${isCompany ? 'background:rgba(73,80,188,0.1); color:var(--primary);' : 'background:rgba(40,167,69,0.1); color:var(--secondary);'}">${isCompany ? '🏢' : '👤'} ${sender ? sender.name.split(' ')[0] : '?'}</div>
+                    <div style="max-width:70%; background:${isCompany ? 'var(--card)' : 'var(--primary-lighter)'}; border:1px solid var(--border); border-radius:12px; padding:8px 12px; font-size:0.85rem;">
+                      <div>${m.text}</div>
+                      <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;">${date} ${time}</div>
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    renderAll();
+    loadMpConfig();
+
+    const sync = new BroadcastChannel('impulsiona_sync');
+    sync.onmessage = () => renderAll();
+    setInterval(renderAll, 3000);
+  </script>
+</body>
+</html>

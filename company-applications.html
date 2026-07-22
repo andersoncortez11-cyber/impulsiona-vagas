@@ -1,0 +1,229 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Candidaturas Recebidas - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <div class="dashboard">
+    <aside class="sidebar">
+      <ul class="sidebar-menu">
+        <li><a href="company-dashboard.html">📊 Painel</a></li>
+        <li><a href="company-jobs.html">💼 Minhas Vagas</a></li>
+        <li><a href="create-job.html">➕ Nova Vaga</a></li>
+        <li><a href="company-applications.html" class="active">📩 Candidaturas</a></li>
+        <li><a href="messages.html">💬 Mensagens</a></li>
+        <li><button onclick="Auth.logout()">🚪 Sair</button></li>
+      </ul>
+    </aside>
+
+    <main class="dashboard-content">
+      <div class="page-header">
+        <h1>Candidaturas Recebidas</h1>
+      </div>
+
+      <div class="search-filters">
+        <select id="filter-job">
+          <option value="">Todas as vagas</option>
+        </select>
+        <select id="filter-status">
+          <option value="">Todos os status</option>
+          <option value="pending">Pendente</option>
+          <option value="viewed">Visualizado</option>
+          <option value="accepted">Aceito</option>
+          <option value="rejected">Rejeitado</option>
+        </select>
+      </div>
+
+      <div id="company-apps-list"></div>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const user = Auth.getUser();
+    if (!user || user.type !== 'company') { window.location.href = 'login.html'; }
+    if (user && !Auth.hasActiveSubscription()) { window.location.href = 'company-dashboard.html'; }
+
+    const companyJobs = Jobs.getCompanyJobs(user.id);
+    const jobSelect = document.getElementById('filter-job');
+    companyJobs.forEach(j => {
+      const opt = document.createElement('option');
+      opt.value = j.id;
+      opt.textContent = j.title;
+      jobSelect.appendChild(opt);
+    });
+
+    function renderCompanyApps() {
+      const statusFilter = document.getElementById('filter-status').value;
+      const jobFilter = document.getElementById('filter-job').value;
+      let apps = Applications.getByCompany(user.id);
+
+      if (jobFilter) apps = apps.filter(a => a.jobId === jobFilter);
+      if (statusFilter) apps = apps.filter(a => a.status === statusFilter);
+      apps.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+      const el = document.getElementById('company-apps-list');
+      if (apps.length === 0) {
+        el.innerHTML = `<div class="card card-body"><div class="empty-state"><div class="empty-icon">📩</div><h3>Nenhuma candidatura encontrada</h3></div></div>`;
+        return;
+      }
+
+      const users = DB.get('users');
+      let rows = '';
+      for (const a of apps) {
+        const job = Jobs.getById(a.jobId);
+        const candidate = users.find(u => u.id === a.userId);
+        if (!job || !candidate) continue;
+        rows += `
+          <tr>
+            <td>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;">${getInitials(candidate.name)}</div>
+                <div>
+                  <strong>${candidate.name}</strong>
+                  <br><span style="font-size:0.8rem; color:var(--text-muted);">${candidate.email}</span>
+                  ${a.resumePdf ? `<br><span style="font-size:0.75rem; color:var(--secondary); font-weight:600;">📄 PDF anexado</span>` : ''}
+                </div>
+              </div>
+            </td>
+            <td>${job.title}</td>
+            <td>${formatDate(a.updatedAt)}</td>
+            <td><span class="tag ${getStatusClass(a.status)}">${getStatusText(a.status)}</span></td>
+            <td>
+              <div class="table-actions">
+                <button class="btn btn-sm btn-outline" onclick="viewCandidateApp('${a.id}')">Ver</button>
+                ${a.status === 'pending' ? `
+                  <button class="btn btn-sm btn-primary" onclick="setAppStatus('${a.id}','accepted')">Aceitar</button>
+                  <button class="btn btn-sm btn-danger" onclick="setAppStatus('${a.id}','rejected')">Rejeitar</button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+
+      el.innerHTML = `<div class="table-container"><table>
+        <thead><tr><th>Candidato</th><th>Vaga</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+
+    function setAppStatus(appId, status) {
+      Applications.updateStatus(appId, status);
+      showToast(`Candidatura ${status === 'accepted' ? 'aceita' : 'rejeitada'}!`, status === 'accepted' ? 'success' : 'info');
+      renderCompanyApps();
+    }
+
+    function viewCandidateApp(appId) {
+      const apps = DB.get('applications');
+      const app = apps.find(a => a.id === appId);
+      const job = Jobs.getById(app.jobId);
+      const users = DB.get('users');
+      const candidate = users.find(u => u.id === app.userId);
+      const resume = Resume.getByUserId(app.userId);
+      if (app.status === 'pending') Applications.updateStatus(appId, 'viewed');
+
+      let resumeHTML = '<p style="color:var(--text-muted);">Currículo não encontrado</p>';
+      if (resume) {
+        resumeHTML = `
+          <div>
+            ${resume.title ? `<p><strong>Título:</strong> ${resume.title}</p>` : ''}
+            ${resume.summary ? `<p style="font-size:0.9rem; margin-top:0.5rem;">${resume.summary}</p>` : ''}
+            ${(resume.experience || []).length > 0 ? `
+              <h4 style="margin-top:1rem; margin-bottom:0.5rem;">Experiência:</h4>
+              ${resume.experience.map(e => `<p style="font-size:0.85rem;"><strong>${e.role}</strong> - ${e.company} (${e.period})<br>${e.description}</p>`).join('')}
+            ` : ''}
+            ${(resume.skills || []).length > 0 ? `
+              <h4 style="margin-top:1rem; margin-bottom:0.5rem;">Habilidades:</h4>
+              <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                ${resume.skills.map(s => `<span class="tag tag-blue">${s}</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      let pdfHTML = '';
+      if (app.resumePdf) {
+        pdfHTML = `
+          <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border);">
+            <h4 style="margin-bottom:0.75rem;">📄 Currículo em PDF</h4>
+            <div class="pdf-viewer-container">
+              <iframe src="${app.resumePdf}" title="Currículo PDF"></iframe>
+              <div class="pdf-download">
+                <span>${app.resumePdfName || 'curriculo.pdf'}</span>
+                <a href="${app.resumePdf}" download="${app.resumePdfName || 'curriculo.pdf'}">Baixar PDF</a>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay show';
+      modal.innerHTML = `
+        <div class="modal" style="max-width:650px;">
+          <div class="modal-header">
+            <h3>${candidate.name}</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p><strong>Email:</strong> ${candidate.email}</p>
+            <p><strong>Vaga:</strong> ${job.title}</p>
+            <p><strong>Status:</strong> <span class="tag ${getStatusClass(app.status)}">${getStatusText(app.status)}</span></p>
+            ${app.coverLetter ? `<div style="margin-top:1rem; padding:1rem; background:var(--bg); border-radius:var(--radius);"><strong>Carta de apresentação:</strong><p style="font-size:0.9rem; margin-top:0.5rem; font-style:italic;">"${app.coverLetter}"</p></div>` : ''}
+            ${pdfHTML}
+            <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border);">
+              <h4 style="margin-bottom:0.75rem;">Currículo</h4>
+              ${resumeHTML}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Fechar</button>
+            <button class="btn btn-primary" onclick="openChat('${candidate.id}','${job.id}')">💬 Mensagem</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    function openChat(candidateId, jobId) {
+      document.querySelector('.modal-overlay.show')?.remove();
+      window.location.href = `messages.html?user=${candidateId}&job=${jobId}`;
+    }
+
+    let _compAppsHash = '';
+    const origRender = renderCompanyApps;
+    renderCompanyApps = function() {
+      origRender();
+      const apps = Applications.getByCompany(user.id);
+      _compAppsHash = apps.map(a => a.id + a.status).join(',');
+      renderNavbar();
+    };
+
+    document.getElementById('filter-status').addEventListener('change', renderCompanyApps);
+    document.getElementById('filter-job').addEventListener('change', renderCompanyApps);
+    renderCompanyApps();
+
+    Sync.on('applications', () => { _compAppsHash = ''; renderCompanyApps(); });
+    Sync.on('jobs', () => { _compAppsHash = ''; renderCompanyApps(); });
+    Sync.on('users', () => { _compAppsHash = ''; renderCompanyApps(); });
+    Live.register('company-apps', { refresh: () => {
+      const apps = Applications.getByCompany(user.id);
+      const newHash = apps.map(a => a.id + a.status).join(',');
+      if (newHash !== _compAppsHash) renderCompanyApps();
+    }});
+    Live.start(3000);
+  </script>
+</body>
+</html>
+

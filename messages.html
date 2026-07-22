@@ -1,0 +1,276 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mensagens - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .msg-layout { display:grid; grid-template-columns:340px 1fr; height:calc(100vh - 140px); min-height:500px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--card); }
+    .msg-sidebar { border-right:1px solid var(--border); display:flex; flex-direction:column; }
+    .msg-sidebar-header { padding:1rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+    .msg-sidebar-header h3 { font-size:1.05rem; margin:0; }
+    .msg-search { padding:0.75rem 1rem; border-bottom:1px solid var(--border); }
+    .msg-search input { width:100%; padding:0.5rem 0.75rem; border:1px solid var(--border); border-radius:var(--radius); font-size:0.85rem; background:var(--bg); }
+    .msg-search input:focus { outline:none; border-color:var(--primary); }
+    .msg-list { flex:1; overflow-y:auto; }
+    .msg-item { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; border-bottom:1px solid var(--bg); transition:var(--transition); position:relative; }
+    .msg-item:hover { background:var(--primary-light); }
+    .msg-item.active { background:rgba(73,80,188,0.08); border-left:3px solid var(--primary); }
+    .msg-item.unread { background:rgba(73,80,188,0.04); }
+    .msg-item.unread .msg-item-name { font-weight:700; }
+    .msg-item.unread .msg-item-preview { font-weight:600; color:var(--text); }
+    .msg-avatar { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem; color:#fff; flex-shrink:0; }
+    .msg-avatar.company { background:var(--primary); }
+    .msg-avatar.candidate { background:var(--secondary); }
+    .msg-item-content { flex:1; min-width:0; }
+    .msg-item-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px; }
+    .msg-item-name { font-size:0.9rem; font-weight:600; }
+    .msg-item-time { font-size:0.7rem; color:var(--text-muted); flex-shrink:0; }
+    .msg-item-job { font-size:0.75rem; color:var(--primary); font-weight:500; margin-bottom:2px; }
+    .msg-item-preview { font-size:0.8rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .msg-unread-badge { width:10px; height:10px; border-radius:50%; background:var(--primary); position:absolute; top:16px; right:16px; }
+    .msg-empty { text-align:center; padding:3rem 1rem; color:var(--text-muted); }
+    .msg-empty .icon { font-size:3rem; margin-bottom:0.75rem; opacity:0.5; }
+    .chat-panel { display:flex; flex-direction:column; }
+    .chat-top { padding:1rem 1.5rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; background:var(--card); }
+    .chat-top-info { flex:1; }
+    .chat-top-name { font-weight:700; font-size:0.95rem; }
+    .chat-top-job { font-size:0.8rem; color:var(--primary); }
+    .chat-top-status { font-size:0.75rem; color:var(--text-muted); }
+    .chat-messages { flex:1; overflow-y:auto; padding:1.5rem; display:flex; flex-direction:column; gap:8px; background:var(--bg); }
+    .chat-date-divider { text-align:center; margin:1rem 0; position:relative; }
+    .chat-date-divider span { background:var(--bg); padding:0 12px; font-size:0.75rem; color:var(--text-muted); position:relative; z-index:1; }
+    .chat-date-divider::before { content:''; position:absolute; top:50%; left:0; right:0; height:1px; background:var(--border); }
+    .chat-bubble { max-width:70%; padding:0.75rem 1rem; border-radius:16px; font-size:0.9rem; line-height:1.4; position:relative; }
+    .chat-bubble.sent { align-self:flex-end; background:var(--primary); color:#fff; border-bottom-right-radius:4px; }
+    .chat-bubble.received { align-self:flex-start; background:var(--card); border:1px solid var(--border); border-bottom-left-radius:4px; }
+    .chat-bubble-time { font-size:0.65rem; margin-top:4px; opacity:0.7; }
+    .chat-bubble.sent .chat-bubble-time { text-align:right; }
+    .chat-input-area { padding:1rem 1.5rem; border-top:1px solid var(--border); display:flex; gap:10px; align-items:center; background:var(--card); }
+    .chat-input-area input { flex:1; padding:0.7rem 1rem; border:1px solid var(--border); border-radius:24px; font-size:0.9rem; }
+    .chat-input-area input:focus { outline:none; border-color:var(--primary); }
+    .chat-input-area button { border-radius:24px; padding:0.7rem 1.5rem; }
+    .chat-welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); }
+    .chat-welcome .icon { font-size:4rem; margin-bottom:1rem; opacity:0.3; }
+    .chat-welcome h3 { color:var(--text); margin-bottom:0.5rem; }
+    .btn-new-chat { padding:0.4rem 0.8rem; font-size:0.8rem; border-radius:var(--radius); }
+  </style>
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <section class="container">
+    <div class="msg-layout">
+      <div class="msg-sidebar">
+        <div class="msg-sidebar-header">
+          <h3>Mensagens</h3>
+        </div>
+        <div class="msg-search">
+          <input type="text" id="search-conversations" placeholder="Buscar conversa..." oninput="filterConversations()">
+        </div>
+        <div class="msg-list" id="conversations-list"></div>
+      </div>
+
+      <div class="chat-panel" id="chat-panel">
+        <div class="chat-welcome" id="chat-welcome">
+          <div class="icon">💬</div>
+          <h3>Suas mensagens</h3>
+          <p>Selecione uma conversa ao lado ou inicie uma nova</p>
+        </div>
+        <div id="chat-active" style="display:none; flex:1; flex-direction:column;">
+          <div class="chat-top" id="chat-top"></div>
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-area">
+            <input type="text" id="chat-msg-input" placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter')sendMessage()">
+            <button class="btn btn-primary" onclick="sendMessage()">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const user = Auth.getUser();
+    if (!user) { window.location.href = 'login.html'; }
+    if (user && user.type === 'company' && !Auth.hasActiveSubscription()) { window.location.href = 'company-dashboard.html'; }
+
+    const params = new URLSearchParams(window.location.search);
+    let activeConvo = null;
+    let allConvos = [];
+
+    function getUserType(otherId) {
+      const users = DB.get('users');
+      const other = users.find(u => u.id === otherId);
+      return other ? other.type : 'candidate';
+    }
+
+    function renderConversations() {
+      allConvos = Messages.getConversations(user.id);
+      const el = document.getElementById('conversations-list');
+      const users = DB.get('users');
+      const apps = DB.get('applications') || [];
+
+      if (allConvos.length === 0) {
+        el.innerHTML = `
+          <div class="msg-empty">
+            <div class="icon">📭</div>
+            <p style="font-size:0.9rem; margin-bottom:0.5rem;">Nenhuma conversa ainda</p>
+            <p style="font-size:0.8rem;">${user.type === 'company'
+              ? 'Envie uma mensagem para um candidato pela página de candidaturas'
+              : 'Envie uma mensagem para uma empresa pela página da vaga'
+            }</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      for (const c of allConvos) {
+        const other = users.find(u => u.id === c.otherId);
+        const job = Jobs.getById(c.jobId);
+        if (!other) continue;
+
+        const hasUnread = DB.getMessages().some(m => m.to === user.id && m.from === c.otherId && m.jobId === c.jobId && !m.read);
+        const isActive = activeConvo && activeConvo.otherId === c.otherId && activeConvo.jobId === c.jobId;
+        const type = getUserType(c.otherId);
+
+        html += `
+          <div class="msg-item ${isActive ? 'active' : ''} ${hasUnread ? 'unread' : ''}" onclick="openChat('${c.otherId}','${c.jobId}')">
+            <div class="msg-avatar ${type}">${getInitials(other.name)}</div>
+            <div class="msg-item-content">
+              <div class="msg-item-top">
+                <span class="msg-item-name">${other.name}</span>
+                <span class="msg-item-time">${timeAgo(c.timestamp)}</span>
+              </div>
+              ${job ? `<div class="msg-item-job">📋 ${job.title}</div>` : ''}
+              <div class="msg-item-preview">${c.text}</div>
+            </div>
+            ${hasUnread ? '<div class="msg-unread-badge"></div>' : ''}
+          </div>
+        `;
+      }
+      el.innerHTML = html;
+    }
+
+    function filterConversations() {
+      const q = document.getElementById('search-conversations').value.toLowerCase();
+      const items = document.querySelectorAll('.msg-item');
+      items.forEach(item => {
+        const name = item.querySelector('.msg-item-name')?.textContent.toLowerCase() || '';
+        const job = item.querySelector('.msg-item-job')?.textContent.toLowerCase() || '';
+        item.style.display = (name.includes(q) || job.includes(q)) ? '' : 'none';
+      });
+    }
+
+    function openChat(otherId, jobId) {
+      activeConvo = { otherId, jobId };
+      const users = DB.get('users');
+      const other = users.find(u => u.id === otherId);
+      const job = Jobs.getById(jobId);
+      Messages.markRead(user.id, otherId, jobId);
+
+      const type = getUserType(otherId);
+      const statusText = type === 'company' ? 'Empresa' : 'Candidato';
+
+      document.getElementById('chat-welcome').style.display = 'none';
+      const chatActive = document.getElementById('chat-active');
+      chatActive.style.display = 'flex';
+
+      document.getElementById('chat-top').innerHTML = `
+        <div class="msg-avatar ${type}" style="width:40px;height:40px;font-size:0.8rem;">${getInitials(other?.name)}</div>
+        <div class="chat-top-info">
+          <div class="chat-top-name">${other?.name || 'Desconhecido'}</div>
+          <div class="chat-top-job">📋 ${job?.title || 'Vaga'}</div>
+          <div class="chat-top-status">${statusText} · ${job?.company || ''} ${job?.location ? '· ' + job.location : ''}</div>
+        </div>
+        <a href="job-detail.html?id=${jobId}" class="btn btn-outline btn-sm" style="font-size:0.75rem;">Ver vaga</a>
+        <button class="btn btn-sm" onclick="deleteConversation('${otherId}','${jobId}')" style="font-size:0.75rem; color:var(--danger); border:1px solid var(--danger); background:transparent; padding:0.4rem 0.8rem; border-radius:var(--radius); cursor:pointer;">Excluir</button>
+      `;
+
+      renderMessages(otherId, jobId);
+      renderConversations();
+      renderNavbar();
+    }
+
+    function renderMessages(otherId, jobId) {
+      const msgs = Messages.getConversation(user.id, otherId, jobId);
+      const el = document.getElementById('chat-messages');
+
+      if (msgs.length === 0) {
+        el.innerHTML = `
+          <div style="text-align:center; padding:2rem; color:var(--text-muted);">
+            <p style="font-size:0.9rem; margin-bottom:0.25rem;">Inicie a conversa!</p>
+            <p style="font-size:0.8rem;">Envie sua primeira mensagem sobre esta vaga</p>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      let lastDate = '';
+
+      msgs.forEach(m => {
+        const msgDate = new Date(m.timestamp).toLocaleDateString('pt-BR');
+        if (msgDate !== lastDate) {
+          lastDate = msgDate;
+          html += `<div class="chat-date-divider"><span>${msgDate}</span></div>`;
+        }
+
+        const time = new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const isSent = m.from === user.id;
+
+        html += `
+          <div class="chat-bubble ${isSent ? 'sent' : 'received'}">
+            ${m.text}
+            <div class="chat-bubble-time">${time} ${isSent ? '✓' : ''}</div>
+          </div>
+        `;
+      });
+
+      el.innerHTML = html;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function sendMessage() {
+      if (!activeConvo) return;
+      const input = document.getElementById('chat-msg-input');
+      const text = input.value.trim();
+      if (!text) return;
+      Messages.send(user.id, activeConvo.otherId, activeConvo.jobId, text);
+      input.value = '';
+      renderMessages(activeConvo.otherId, activeConvo.jobId);
+      renderConversations();
+      renderNavbar();
+    }
+
+    function deleteConversation(otherId, jobId) {
+      if (!confirm('Excluir esta conversa? Esta ação não pode ser desfeita.')) return;
+      Messages.deleteConversation(user.id, otherId, jobId);
+      activeConvo = null;
+      document.getElementById('chat-active').style.display = 'none';
+      document.getElementById('chat-welcome').style.display = 'flex';
+      renderConversations();
+      renderNavbar();
+    }
+
+    renderConversations();
+
+    if (params.get('user') && params.get('job')) {
+      setTimeout(() => openChat(params.get('user'), params.get('job')), 100);
+    }
+
+    setInterval(() => {
+      if (activeConvo) {
+        renderMessages(activeConvo.otherId, activeConvo.jobId);
+      }
+      renderConversations();
+    }, 5000);
+  </script>
+</body>
+</html>

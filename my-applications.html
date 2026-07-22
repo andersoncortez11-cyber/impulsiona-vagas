@@ -1,0 +1,182 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minhas Candidaturas - Impulsiona Vagas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="navbar" id="navbar"></header>
+
+  <section class="container">
+    <div class="page-header">
+      <h1>Minhas Candidaturas</h1>
+    </div>
+
+    <div class="search-filters" style="margin-bottom:1.5rem;">
+      <select id="filter-status">
+        <option value="">Todos os status</option>
+        <option value="pending">Pendente</option>
+        <option value="viewed">Visualizado</option>
+        <option value="accepted">Aceito</option>
+        <option value="rejected">Rejeitado</option>
+      </select>
+    </div>
+
+    <div id="applications-list"></div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>`n  <script src="js/app.js"></script>
+  <script>
+    renderNavbar();
+    const user = Auth.getUser();
+    if (!user || user.type !== 'candidate') { window.location.href = 'login.html'; }
+
+    function renderApplications() {
+      const statusFilter = document.getElementById('filter-status').value;
+      let apps = Applications.getByUser(user.id);
+      if (statusFilter) apps = apps.filter(a => a.status === statusFilter);
+      apps.sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt));
+
+      const el = document.getElementById('applications-list');
+      if (apps.length === 0) {
+        el.innerHTML = `
+          <div class="card card-body">
+            <div class="empty-state">
+              <div class="empty-icon">📋</div>
+              <h3>Nenhuma candidatura encontrada</h3>
+              <p style="margin-bottom:1rem;">${statusFilter ? 'Tente alterar o filtro' : 'Comece a se candidatar para vagas!'}</p>
+              <a href="jobs.html" class="btn btn-primary">Buscar vagas</a>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      for (const a of apps) {
+        const job = Jobs.getById(a.jobId);
+        if (!job) continue;
+        html += `
+          <div class="application-card">
+            <div class="app-info">
+              <h4><a href="job-detail.html?id=${job.id}" style="color:var(--primary);">${job.title}</a></h4>
+              <p>${job.company} · ${job.location} · Candidatura em ${formatDate(a.appliedAt)}</p>
+              ${a.resumePdf ? `<p style="font-size:0.75rem; color:var(--secondary); margin-top:4px; font-weight:600;">📄 PDF anexado: ${a.resumePdfName || 'curriculo.pdf'}</p>` : ''}
+              ${a.coverLetter ? `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px; font-style:italic;">"${a.coverLetter.substring(0, 100)}${a.coverLetter.length > 100 ? '...' : ''}"</p>` : ''}
+            </div>
+            <div class="app-status" style="text-align:right;">
+              <span class="tag ${getStatusClass(a.status)}">${getStatusText(a.status)}</span>
+              <div style="margin-top:8px; display:flex; gap:6px; justify-content:flex-end;">
+                <button class="btn btn-sm btn-outline" onclick="viewApplication('${a.id}')">Detalhes</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteApplication('${a.id}')">Excluir</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      el.innerHTML = html;
+    }
+
+    function viewApplication(appId) {
+      const apps = DB.get('applications');
+      const app = apps.find(a => a.id === appId);
+      const job = Jobs.getById(app.jobId);
+      if (!job) return;
+
+      let pdfHTML = '';
+      if (app.resumePdf) {
+        pdfHTML = `
+          <div style="margin-top:1rem;">
+            <strong>📄 Currículo em PDF:</strong>
+            <div class="pdf-viewer-container">
+              <iframe src="${app.resumePdf}" title="Currículo PDF"></iframe>
+              <div class="pdf-download">
+                <span>${app.resumePdfName || 'curriculo.pdf'}</span>
+                <a href="${app.resumePdf}" download="${app.resumePdfName || 'curriculo.pdf'}">Baixar PDF</a>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay show';
+      modal.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <h3>Candidatura</h3>
+            <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <h4 style="margin-bottom:0.5rem;">${job.title}</h4>
+            <p style="color:var(--text-light); margin-bottom:1rem;">${job.company} · ${job.location}</p>
+            <div style="margin-bottom:1rem;">
+              <strong>Status:</strong>
+              <span class="tag ${getStatusClass(app.status)}">${getStatusText(app.status)}</span>
+            </div>
+            <p><strong>Data da candidatura:</strong> ${formatDate(app.appliedAt)}</p>
+            <p><strong>Última atualização:</strong> ${formatDate(app.updatedAt)}</p>
+            ${app.coverLetter ? `
+              <div style="margin-top:1rem;">
+                <strong>Carta de apresentação:</strong>
+                <p style="font-size:0.9rem; color:var(--text-light); margin-top:0.5rem; padding:1rem; background:var(--bg); border-radius:var(--radius);">${app.coverLetter}</p>
+              </div>
+            ` : ''}
+            ${pdfHTML}
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-danger btn-sm" onclick="deleteApplication('${app.id}'); this.closest('.modal-overlay').remove();">Excluir candidatura</button>
+            <a href="messages.html?user=${job.companyId}&job=${job.id}" class="btn btn-primary btn-sm">💬 Mensagem</a>
+            <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Fechar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    function deleteApplication(appId) {
+      if (confirm('Tem certeza que deseja excluir esta candidatura?')) {
+        Applications.delete(appId);
+        showToast('Candidatura excluída!', 'info');
+        _myAppsHash = '';
+        renderApplications();
+        renderNavbar();
+      }
+    }
+
+    document.getElementById('filter-status').addEventListener('change', renderApplications);
+    renderApplications();
+
+    let _myAppsHash = '';
+    function getMyAppsHash() {
+      const apps = Applications.getByUser(user.id);
+      return apps.map(a => a.id + a.status + a.updatedAt).join(',');
+    }
+
+    Sync.on('applications', () => {
+      const newHash = getMyAppsHash();
+      if (newHash !== _myAppsHash) {
+        _myAppsHash = newHash;
+        renderApplications();
+        renderNavbar();
+      }
+    });
+    Sync.on('notifications', () => renderNavbar());
+    Live.register('my-apps', { refresh: () => {
+      const newHash = getMyAppsHash();
+      if (newHash !== _myAppsHash) {
+        _myAppsHash = newHash;
+        renderApplications();
+        renderNavbar();
+      }
+    }});
+    Live.start(3000);
+  </script>
+</body>
+</html>
+
