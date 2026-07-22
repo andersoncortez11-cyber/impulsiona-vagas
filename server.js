@@ -562,7 +562,16 @@ initDB().then(() => {
     console.log('');
   });
 }).catch(e => {
-  console.error('[FATAL] Erro ao conectar no PostgreSQL:', e.message);
-  console.error('Defina DATABASE_URL no ambiente');
+  console.error('');
+  console.error('[FATAL] Erro ao conectar no PostgreSQL');
+  console.error('  Erro:', e.message);
+  console.error('  DATABASE_URL:', process.env.DATABASE_URL ? 'definida (' + process.env.DATABASE_URL.substring(0, 30) + '...)' : 'NAO DEFINIDA');
+  console.error('');
+  console.error('  Como resolver:');
+  console.error('  1. No Render, va no SERVICO WEB (nao no banco)');
+  console.error('  2. Aba Environment');
+  console.error('  3. Adicione: Key=DATABASE_URL Value=<sua URL do banco>');
+  console.error('  4. Save and redeploy');
+  console.error('');
   process.exit(1);
 });
