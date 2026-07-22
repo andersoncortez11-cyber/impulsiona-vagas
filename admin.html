@@ -284,8 +284,6 @@
       initAdmin();
     }
 
-    function initAdmin() {
-
     async function toggleMpMode() {
       const isTest = document.getElementById('mp-mode-test').checked;
       const hint = document.getElementById('mp-token-hint');
@@ -846,12 +844,11 @@
       }).join('');
     }
 
-    renderAll();
-    loadMpConfig();
-
-    const sync = new BroadcastChannel('impulsiona_sync');
-    sync.onmessage = () => renderAll();
-    setInterval(renderAll, 3000);
+    function initAdmin() {
+      loadMpConfig();
+      const sync = new BroadcastChannel('impulsiona_sync');
+      sync.onmessage = () => renderAll();
+      setInterval(renderAll, 3000);
     }
   </script>
 </body>
