@@ -693,7 +693,6 @@ function renderNavbar() {
     <div class="logo" onclick="location.href='index.html'">Impulsiona <span>Vagas</span></div>
     <nav>
       ${navLinks}
-      <a href="admin.html" style="font-size:0.7rem; opacity:0.5; padding:4px 8px;" title="Painel Admin">⚙</a>
       ${userMenu}
     </nav>
   `;
