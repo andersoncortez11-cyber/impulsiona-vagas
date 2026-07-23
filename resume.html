@@ -174,6 +174,35 @@
               </div>
             </div>
           </div>
+
+          <div class="resume-section">
+            <div class="resume-section-header"><h3>📎 Currículo em PDF</h3></div>
+            <div class="resume-section-body">
+              <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+                Faça upload do seu currículo em PDF. Ele será anexado automaticamente quando você se candidatar a uma vaga.
+              </p>
+              ${resume.pdf ? `
+                <div id="pdf-current" style="display:flex; align-items:center; gap:12px; padding:1rem; background:#d4edda; border:1px solid #28a745; border-radius:var(--radius); margin-bottom:1rem;">
+                  <span style="font-size:1.5rem;">✅</span>
+                  <div style="flex:1;">
+                    <strong>${resume.pdfName || 'curriculo.pdf'}</strong>
+                    <div style="font-size:0.8rem; color:#155724;">PDF salvo no servidor</div>
+                  </div>
+                  <button class="btn btn-sm btn-outline" onclick="viewSavedPdf()">👁 Ver</button>
+                  <button class="btn btn-sm btn-danger" onclick="removeSavedPdf()">🗑 Remover</button>
+                </div>
+              ` : ''}
+              <div class="file-upload" id="resume-pdf-upload" onclick="document.getElementById('resume-pdf-input').click()">
+                <input type="file" id="resume-pdf-input" accept=".pdf" style="display:none" onchange="handleResumePdf(event)">
+                <div class="file-upload-content">
+                  <div class="file-upload-icon">📎</div>
+                  <div class="file-upload-text">${resume.pdf ? 'Trocar PDF' : 'Arraste um arquivo PDF ou clique para selecionar'}</div>
+                  <div class="file-upload-hint">Apenas arquivos PDF (máx. 5MB)</div>
+                </div>
+              </div>
+              <div id="resume-pdf-error" style="color:var(--danger); font-size:0.8rem; margin-top:4px; display:none;"></div>
+            </div>
+          </div>
         `;
       }
 
@@ -235,6 +264,68 @@
         Resume.save(resume);
         showToast('Currículo salvo com sucesso!', 'success');
       }
+
+      function handleResumePdf(event) {
+        const file = event.target.files[0];
+        const errorEl = document.getElementById('resume-pdf-error');
+        const areaEl = document.getElementById('resume-pdf-upload');
+        if (!file) return;
+
+        errorEl.style.display = 'none';
+        if (file.type !== 'application/pdf') {
+          errorEl.textContent = 'Apenas arquivos PDF são aceitos.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          errorEl.textContent = 'Arquivo muito grande. Máximo: 5MB.';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        areaEl.querySelector('.file-upload-content').innerHTML =
+          '<div class="file-upload-icon">⏳</div><div class="file-upload-text">Carregando ' + file.name + '...</div>';
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          resume.pdf = e.target.result;
+          resume.pdfName = file.name;
+          areaEl.classList.add('file-upload-success');
+          areaEl.querySelector('.file-upload-content').innerHTML =
+            '<div class="file-upload-icon">✅</div><div class="file-upload-text">' + file.name + '</div><div class="file-upload-hint">' + (file.size / 1024).toFixed(1) + ' KB · Clique para trocar</div>';
+          collectFormData();
+          Resume.save(resume);
+          showToast('PDF salvo automaticamente!', 'success');
+          renderForm();
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function removeSavedPdf() {
+        if (!confirm('Remover o PDF do currículo?')) return;
+        resume.pdf = '';
+        resume.pdfName = '';
+        collectFormData();
+        Resume.save(resume);
+        showToast('PDF removido', 'success');
+        renderForm();
+      }
+
+      function viewSavedPdf() {
+        if (!resume.pdf) return;
+        const w = window.open('', '_blank');
+        w.document.write('<iframe src="' + resume.pdf + '" style="width:100%;height:100%;border:none;" frameborder="0"></iframe>');
+        w.document.title = resume.pdfName || 'Currículo PDF';
+      }
+
+      let _autoSaveTimer = null;
+      document.addEventListener('input', function() {
+        if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+        _autoSaveTimer = setTimeout(function() {
+          collectFormData();
+          Resume.save(resume);
+        }, 2000);
+      });
 
       function previewResume() {
         collectFormData();

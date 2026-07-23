@@ -151,9 +151,21 @@
           </div>
         `;
       } else {
+        const hasSavedPdf = resume.pdf && resume.pdf.length > 100;
+        if (hasSavedPdf) {
+          _applyPdfData = resume.pdf;
+          _applyPdfName = resume.pdfName || 'curriculo.pdf';
+        }
         body.innerHTML = `
           <p style="margin-bottom:1rem; color:var(--text-light);">Enviando currículo: <strong>${resume.title || 'Sem título'}</strong></p>
-          <div class="form-group">
+          ${hasSavedPdf ? `
+            <div style="display:flex; align-items:center; gap:10px; padding:0.75rem 1rem; background:#d4edda; border:1px solid #28a745; border-radius:var(--radius); margin-bottom:1rem;">
+              <span style="font-size:1.3rem;">✅</span>
+              <div style="flex:1;"><strong>${resume.pdfName || 'curriculo.pdf'}</strong><div style="font-size:0.75rem; color:#155724;">PDF do seu currículo será anexado automaticamente</div></div>
+              <button class="btn btn-sm btn-outline" onclick="changeApplyPdf()">Trocar PDF</button>
+            </div>
+          ` : ''}
+          <div class="form-group" id="pdf-upload-group" style="${hasSavedPdf ? 'display:none;' : ''}">
             <label for="resume-pdf">Currículo em PDF *</label>
             <div class="file-upload" id="file-upload-area" onclick="document.getElementById('resume-pdf').click()">
               <input type="file" id="resume-pdf" accept=".pdf" style="display:none" onchange="handlePdfUpload(event)">
@@ -234,6 +246,12 @@
       } else {
         showToast(result.error, 'error');
       }
+    }
+
+    function changeApplyPdf() {
+      _applyPdfData = null;
+      _applyPdfName = '';
+      document.getElementById('pdf-upload-group').style.display = 'block';
     }
 
     function saveJob(id) { showToast('Vaga salva!', 'success'); }
