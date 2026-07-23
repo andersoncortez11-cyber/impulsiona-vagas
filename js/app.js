@@ -204,9 +204,10 @@ const Auth = {
     if (!user) return;
     if (!confirm('Tem certeza que deseja excluir sua conta? Todos os seus dados serão perdidos permanentemente.')) return;
 
+    _isSyncing = true;
+
     fetch('/api/users/' + user.id, { method: 'DELETE' }).then(r => r.json()).then(data => {
       if (data.success) {
-        DB.remove('currentUser');
         localStorage.removeItem('impulsiona_currentUser');
         localStorage.removeItem('impulsiona_users');
         localStorage.removeItem('impulsiona_jobs');
@@ -214,12 +215,15 @@ const Auth = {
         localStorage.removeItem('impulsiona_messages');
         localStorage.removeItem('impulsiona_notifications');
         localStorage.removeItem('impulsiona_resumes');
+        localStorage.removeItem('impulsiona_seeded');
         showToast('Conta excluída com sucesso', 'success');
         setTimeout(() => window.location.href = 'index.html', 300);
       } else {
+        _isSyncing = false;
         showToast('Erro ao excluir: ' + (data.error || 'desconhecido'), 'error');
       }
     }).catch(e => {
+      _isSyncing = false;
       showToast('Erro ao excluir: ' + e.message, 'error');
     });
   },
