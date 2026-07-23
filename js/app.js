@@ -203,21 +203,26 @@ const Auth = {
     const user = this.getUser();
     if (!user) return;
     if (!confirm('Tem certeza que deseja excluir sua conta? Todos os seus dados serão perdidos permanentemente.')) return;
-    const users = DB.getUsers().filter(u => u.id !== user.id);
-    DB.setUsers(users);
-    if (user.type === 'company') {
-      DB.setJobs(DB.getJobs().filter(j => j.companyId !== user.id));
-      DB.setApplications(DB.getApplications().filter(a => { const job = (DB.getJobs() || []).find(j => j.id === a.jobId); return job && job.companyId !== user.id; }));
-    } else {
-      DB.setApplications(DB.getApplications().filter(a => a.userId !== user.id));
-      DB.setResumes(DB.getResumes().filter(r => r.userId !== user.id));
-    }
-    DB.setMessages(DB.getMessages().filter(m => m.from !== user.id && m.to !== user.id));
-    DB.setNotifications(DB.getNotifications().filter(n => n.userId !== user.id));
-    DB.remove('currentUser');
-    localStorage.removeItem('impulsiona_currentUser');
-    showToast('Conta excluída com sucesso', 'success');
-    setTimeout(() => window.location.href = 'index.html', 600);
+
+    fetch('/api/users/' + user.id, { method: 'DELETE' }).then(() => {
+      const users = DB.getUsers().filter(u => u.id !== user.id);
+      DB.setUsers(users);
+      if (user.type === 'company') {
+        DB.setJobs(DB.getJobs().filter(j => j.companyId !== user.id));
+        DB.setApplications(DB.getApplications().filter(a => { const job = (DB.getJobs() || []).find(j => j.id === a.jobId); return job && job.companyId !== user.id; }));
+      } else {
+        DB.setApplications(DB.getApplications().filter(a => a.userId !== user.id));
+        DB.setResumes(DB.getResumes().filter(r => r.userId !== user.id));
+      }
+      DB.setMessages(DB.getMessages().filter(m => m.from !== user.id && m.to !== user.id));
+      DB.setNotifications(DB.getNotifications().filter(n => n.userId !== user.id));
+      DB.remove('currentUser');
+      localStorage.removeItem('impulsiona_currentUser');
+      showToast('Conta excluída com sucesso', 'success');
+      setTimeout(() => window.location.href = 'index.html', 600);
+    }).catch(e => {
+      showToast('Erro ao excluir: ' + e.message, 'error');
+    });
   },
   getUser() { return DB.getCurrentUser(); },
   isLoggedIn() { return !!DB.getCurrentUser(); },
