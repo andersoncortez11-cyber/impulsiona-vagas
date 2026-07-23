@@ -204,22 +204,21 @@ const Auth = {
     if (!user) return;
     if (!confirm('Tem certeza que deseja excluir sua conta? Todos os seus dados serão perdidos permanentemente.')) return;
 
-    fetch('/api/users/' + user.id, { method: 'DELETE' }).then(() => {
-      const users = DB.getUsers().filter(u => u.id !== user.id);
-      DB.setUsers(users);
-      if (user.type === 'company') {
-        DB.setJobs(DB.getJobs().filter(j => j.companyId !== user.id));
-        DB.setApplications(DB.getApplications().filter(a => { const job = (DB.getJobs() || []).find(j => j.id === a.jobId); return job && job.companyId !== user.id; }));
+    fetch('/api/users/' + user.id, { method: 'DELETE' }).then(r => r.json()).then(data => {
+      if (data.success) {
+        DB.remove('currentUser');
+        localStorage.removeItem('impulsiona_currentUser');
+        localStorage.removeItem('impulsiona_users');
+        localStorage.removeItem('impulsiona_jobs');
+        localStorage.removeItem('impulsiona_applications');
+        localStorage.removeItem('impulsiona_messages');
+        localStorage.removeItem('impulsiona_notifications');
+        localStorage.removeItem('impulsiona_resumes');
+        showToast('Conta excluída com sucesso', 'success');
+        setTimeout(() => window.location.href = 'index.html', 300);
       } else {
-        DB.setApplications(DB.getApplications().filter(a => a.userId !== user.id));
-        DB.setResumes(DB.getResumes().filter(r => r.userId !== user.id));
+        showToast('Erro ao excluir: ' + (data.error || 'desconhecido'), 'error');
       }
-      DB.setMessages(DB.getMessages().filter(m => m.from !== user.id && m.to !== user.id));
-      DB.setNotifications(DB.getNotifications().filter(n => n.userId !== user.id));
-      DB.remove('currentUser');
-      localStorage.removeItem('impulsiona_currentUser');
-      showToast('Conta excluída com sucesso', 'success');
-      setTimeout(() => window.location.href = 'index.html', 600);
     }).catch(e => {
       showToast('Erro ao excluir: ' + e.message, 'error');
     });
