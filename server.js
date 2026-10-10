@@ -12,8 +12,12 @@ const PORT = process.env.PORT || 3000;
 // ===== DATABASE =====
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000
 });
+db.on('error', (e) => { console.error('[DB POOL ERROR]', e.message); });
+
+let dbReady = false;
 
 async function initDB() {
   await db.query(`
@@ -113,7 +117,7 @@ app.use(express.json({ limit: '50mb' }));
 // ===== STATIC FILES =====
 const MIME = { '.html':'text/html','.css':'text/css','.js':'application/javascript','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.gif':'image/gif','.svg':'image/svg+xml','.ico':'image/x-icon','.pdf':'application/pdf','.woff':'font/woff','.woff2':'font/woff2','.ttf':'font/ttf' };
 app.use((req, res, next) => {
-  if (req.url.startsWith('/api/')) return next();
+  if (req.url.startsWith('/api/') || req.url.startsWith('/health') || req.url.startsWith('/socket.io')) return next();
   let fp = path.join(ROOT, req.url === '/' ? 'index.html' : req.url);
   fs.readFile(fp, (err, data) => {
     if (err) { res.status(404).send('404'); return; }
@@ -589,28 +593,48 @@ app.post('/api/webhook/test', (req, res) => {
   res.json({ success: true });
 });
 
-// ===== START =====
-initDB().then(() => {
-  server.listen(PORT, () => {
-    console.log('');
-    console.log('==============================================');
-    console.log('  Servidor Impulsiona Vagas (PostgreSQL + Socket.io)');
-    console.log(`  http://localhost:${PORT}`);
-    console.log('  Ctrl+C para parar');
-    console.log('==============================================');
-    console.log('');
+// ===== HEALTH =====
+app.get('/health', async (req, res) => {
+  let dbOk = false, dbErr = null;
+  try { await db.query('SELECT 1'); dbOk = true; } catch (e) { dbErr = e.message; }
+  res.status(dbOk ? 200 : 500).json({
+    ok: dbOk,
+    db: dbOk ? 'connected' : 'error',
+    dbError: dbErr,
+    databaseUrl: process.env.DATABASE_URL
+      ? process.env.DATABASE_URL.replace(/:[^:@]+@/, ':***@')
+      : 'NAO DEFINIDA'
   });
-}).catch(e => {
-  console.error('');
-  console.error('[FATAL] Erro ao conectar no PostgreSQL');
-  console.error('  Erro:', e.message);
-  console.error('  DATABASE_URL:', process.env.DATABASE_URL ? 'definida (' + process.env.DATABASE_URL.substring(0, 30) + '...)' : 'NAO DEFINIDA');
-  console.error('');
-  console.error('  Como resolver:');
-  console.error('  1. No Render, va no SERVICO WEB (nao no banco)');
-  console.error('  2. Aba Environment');
-  console.error('  3. Adicione: Key=DATABASE_URL Value=<sua URL do banco>');
-  console.error('  4. Save and redeploy');
-  console.error('');
-  process.exit(1);
+});
+
+// ===== START =====
+async function initDBWithRetry(attempt = 1) {
+  try {
+    await initDB();
+    dbReady = true;
+    console.log('[DB] Conectado com sucesso');
+    return true;
+  } catch (e) {
+    console.error('');
+    console.error(`[DB] Falha ao conectar (tentativa ${attempt})`);
+    console.error('  Erro:', e.message);
+    console.error('  DATABASE_URL:', process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 40) + '...' : 'NAO DEFINIDA');
+    if (attempt < 10) {
+      console.error(`  Tentando de novo em 5s...`);
+      await new Promise(r => setTimeout(r, 5000));
+      return initDBWithRetry(attempt + 1);
+    }
+    console.error('  Servidor seguira rodando; veja /health para diagnostico.');
+    return false;
+  }
+}
+
+server.listen(PORT, async () => {
+  console.log('');
+  console.log('==============================================');
+  console.log('  Servidor Impulsiona Vagas (PostgreSQL + Socket.io)');
+  console.log(`  Porta: ${PORT}`);
+  console.log('==============================================');
+  console.log('');
+  await initDBWithRetry();
 });
