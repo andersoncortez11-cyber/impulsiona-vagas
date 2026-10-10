@@ -683,6 +683,8 @@ function renderNavbar() {
             <a href="messages.html">Mensagens</a>
           `}
           <div class="divider"></div>
+          <a href="admin.html" style="font-size:0.8rem;color:var(--text-muted);">⚙ Painel Admin</a>
+          <div class="divider"></div>
           <button onclick="Auth.logout()">Sair</button>
         </div>
       </div>
