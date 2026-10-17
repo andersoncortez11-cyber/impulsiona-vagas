@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: impulsiona
+      POSTGRES_PASSWORD: impulsiona123
+      POSTGRES_DB: impulsiona
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U impulsiona -d impulsiona"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgresql://impulsiona:impulsiona123@db:5432/impulsiona
+      ADMIN_PASSWORD: "13061989"
+      NODE_ENV: production
+    ports:
+      - "80:3000"
+
+volumes:
+  pgdata:

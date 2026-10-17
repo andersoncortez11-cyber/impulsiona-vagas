@@ -10,9 +10,11 @@ const ROOT = __dirname;
 const PORT = process.env.PORT || 3000;
 
 // ===== DATABASE =====
+const dbUrl = process.env.DATABASE_URL || '';
+const useSsl = dbUrl.includes('render.com') || dbUrl.includes('sslmode=require') || process.env.DB_SSL === 'true';
 const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  connectionString: dbUrl,
+  ssl: useSsl ? { rejectUnauthorized: false } : false,
   connectionTimeoutMillis: 10000
 });
 db.on('error', (e) => { console.error('[DB POOL ERROR]', e.message); });
